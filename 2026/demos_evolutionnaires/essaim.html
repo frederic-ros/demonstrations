@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Essaim particulaire pas à pas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Source+Serif+4:opsz,wght@8..60,600&display=swap">
+<style>
+/* Mise en page : la carte de l'essaim à gauche, le tableau de bord à droite ; une seule colonne sur téléphone. */
+:root {
+  --bg: #F7F4F9; --panel: #FFFFFF; --ink: #2A1838; --muted: #6B6475; --line: #E3DCEA;
+  --accent: #6A2E86; --accent-soft: #EEE6F3; --pink: #C01680; --green: #2E7D4F; --blue: #2F6FA3; --orange: #C26A05;
+  --font-display: "Source Serif 4", Georgia, serif;
+  --font-body: "Source Sans 3", "Segoe UI", Arial, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #17111D; --panel: #221A2B; --ink: #F1EAF6; --muted: #A99DB6; --line: #3A2E46;
+  --accent: #C79BE0; --accent-soft: #33243F; --pink: #F05AAE; --green: #5FC08A; --blue: #79B2E3; --orange: #F0A24A; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #17111D; --panel: #221A2B; --ink: #F1EAF6; --muted: #A99DB6; --line: #3A2E46;
+  --accent: #C79BE0; --accent-soft: #33243F; --pink: #F05AAE; --green: #5FC08A; --blue: #79B2E3; --orange: #F0A24A; color-scheme: dark }
+* { box-sizing: border-box }
+html, body { margin: 0 }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.45; padding: 20px 16px 32px }
+.wrap { max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px }
+header { display: flex; flex-direction: column; gap: 4px }
+.eyebrow { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); font-weight: 700 }
+h1 { font-family: var(--font-display); font-weight: 600; font-size: clamp(24px, 4vw, 34px); line-height: 1.15; margin: 0; text-wrap: balance }
+.lede { color: var(--muted); margin: 0; max-width: 68ch }
+.grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: start }
+@media (max-width: 760px) { .grid { grid-template-columns: minmax(0, 1fr) } }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0 }
+canvas#map { width: 100%; aspect-ratio: 1; max-width: 100%; display: block; border-radius: 6px; touch-action: manipulation }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted) }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; background: var(--c); border: 1px solid var(--muted) }
+.buttons { display: flex; flex-wrap: wrap; gap: 8px }
+button { font: inherit; font-size: 15px; font-weight: 600; border-radius: 8px; padding: 8px 14px; cursor: pointer; border: 1px solid var(--accent); background: var(--panel); color: var(--accent) }
+button.primary { background: var(--accent); color: var(--panel) }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--pink); outline-offset: 2px }
+.phases { display: flex; flex-wrap: wrap; gap: 6px }
+.phase { font-size: 13px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted) }
+.phase.on { background: var(--accent); border-color: var(--accent); color: var(--panel); font-weight: 600 }
+.explain { background: var(--accent-soft); border-radius: 8px; padding: 10px 12px; min-height: 5.5em; font-size: 15px }
+.explain b { color: var(--accent) }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px }
+.stat { display: flex; flex-direction: column; gap: 2px }
+.stat .k { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em }
+.stat .v { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums }
+canvas#curve { width: 100%; height: 130px; display: block }
+.controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px 14px }
+@media (max-width: 420px) { .controls { grid-template-columns: minmax(0, 1fr) } }
+label { display: flex; flex-direction: column; gap: 2px; font-size: 14px }
+label .row { display: flex; justify-content: space-between; gap: 8px }
+label output { font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 600 }
+input[type=range] { width: 100%; accent-color: var(--accent) }
+select, input[type=number] { font: inherit; font-size: 14px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--ink) }
+.check { flex-direction: row; align-items: center; gap: 8px }
+footer { font-size: 13px; color: var(--muted) }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important } }
+</style><style>.try-banner{margin:16px 0 20px;padding:16px 20px;background:linear-gradient(110deg,#e1f5ed,#e8f2ff);border-left:6px solid #16866b;border-radius:12px;color:#153c40;box-shadow:0 2px 9px #173b5012}.try-banner strong{display:block;font-size:1.09rem;margin-bottom:5px}.try-banner p{margin:0;line-height:1.55}</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="eyebrow">LAB'IA Loire Valley · Les algorithmes évolutionnaires</span>
+    <h1>Un essaim particulaire, itération après itération</h1><aside class="try-banner" role="note"><strong>▶ À vous de jouer : observez l’évolution pas à pas !</strong><p>Suivez les oiseaux sur le paysage : avancez <b>une itération à la fois</b> pour voir comment l’essaim découvre les vallées.</p></aside>
+    <p class="lede">Chaque oiseau est une solution qui vole sur le paysage (plus c'est foncé, meilleur c'est). Il garde le souvenir du meilleur endroit qu'il a visité et connaît la meilleure découverte du groupe. Activez « décomposer » pour voir les trois flèches qui décident de son prochain déplacement.</p>
+  </header>
+  <div class="grid">
+    <div class="panel">
+      <div style="padding:10px 13px;margin:6px 0 12px;background:#f0f6fc;border-left:4px solid #3678a7;border-radius:6px;font-size:14px"><b>Imaginez une montagne vue du ciel.</b> Les courbes dessinent le relief : les zones <b>bleues sont les vallées à atteindre</b> (coût faible), puis le vert, le jaune et le rouge indiquent des hauteurs de plus en plus coûteuses. <b>Objectif : descendre au fond d’une vallée.</b> Les points sont des oiseaux qui cherchent ensemble les vallées.</div><div style="display:flex;align-items:center;gap:8px;font-size:13px;margin:0 0 7px"><b>But :</b> <span style="background:#175b89;color:white;padding:3px 9px;border-radius:5px">Bleu · meilleur</span><span style="background:#72c597;padding:3px 9px;border-radius:5px">Vert</span><span style="background:#f7d571;padding:3px 9px;border-radius:5px">Jaune</span><span style="background:#cf5d4b;color:white;padding:3px 9px;border-radius:5px">Rouge · moins bon</span></div><canvas id="map" width="560" height="560" aria-label="Paysage de coût et essaim"></canvas>
+      <div class="legend">
+        <span style="--c: #FFFFFF">oiseaux</span>
+        <span style="--c: var(--pink)">meilleur endroit du groupe</span>
+        <span style="--c: #9AA0A8">1. inertie</span>
+        <span style="--c: var(--blue)">2. souvenir</span>
+        <span style="--c: var(--orange)">3. groupe</span>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="explain" id="explain" aria-live="polite"></div>
+      <div class="buttons">
+        <button class="primary" id="step">Itération suivante</button>
+        <button id="play">Lecture</button>
+        <button id="reset">Recommencer</button>
+      </div>
+      <div class="stats">
+        <div class="stat"><span class="k">itération</span><span class="v" id="sGen">0</span></div>
+        <div class="stat"><span class="k">meilleur coût</span><span class="v" id="sBest">-</span></div>
+        <div class="stat"><span class="k">dispersion</span><span class="v" id="sMean">-</span></div>
+      </div>
+      <canvas id="curve" aria-label="Évolution du meilleur coût"></canvas>
+      <div class="controls">
+        <label for="fn"><span class="row">Paysage</span>
+          <select id="fn"><option value="ackley">Ackley : un puits entouré de pièges</option><option value="rastrigin">Rastrigin : beaucoup de pièges</option><option value="himmelblau">Himmelblau : quatre creux</option></select></label>
+        <label for="seed"><span class="row">Graine du hasard</span><input type="number" id="seed" value="8" min="1" max="99999"></label>
+        <label for="n"><span class="row">Nombre d'oiseaux <output id="oN">24</output></span><input type="range" id="n" min="4" max="80" value="24"></label>
+        <label for="w"><span class="row">Inertie w <output id="oW">0,72</output></span><input type="range" id="w" min="0" max="110" value="72"></label>
+        <label for="c1"><span class="row">Souvenir c1 <output id="oC1">1,49</output></span><input type="range" id="c1" min="0" max="300" value="149"></label>
+        <label for="c2"><span class="row">Groupe c2 <output id="oC2">1,49</output></span><input type="range" id="c2" min="0" max="300" value="149"></label>
+        <label for="dec" class="check"><input type="checkbox" id="dec" checked> Décomposer le prochain pas d'un oiseau</label>
+        <label for="trail" class="check"><input type="checkbox" id="trail" checked> Traces des derniers pas</label>
+      </div>
+    </div>
+  </div>
+  <footer>Démonstration accompagnant l'article « Les algorithmes évolutionnaires » (Frédéric Ros, Technopole d'Orléans, LAB'IA Loire Valley), d'après Kennedy et Eberhart (1995). À chaque itération : v ← w·v + c1·r1·(souvenir − x) + c2·r2·(groupe − x), puis x ← x + v. Même graine, même vol. Cliquez sur un oiseau pour le suivre.</footer>
+</div>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const fmt = (v, d = 2) => (Math.abs(v) >= 1000 ? v.toFixed(0) : v.toFixed(d)).replace('.', ',').replace('-', '−');
+  let seedState = 8;
+  function rand() { seedState |= 0; seedState = seedState + 0x6D2B79F5 | 0; let t = Math.imul(seedState ^ seedState >>> 15, 1 | seedState);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }
+  const FN = {
+    ackley: { lo: -5, hi: 5, f: (x, y) => -20 * Math.exp(-.2 * Math.sqrt(.5 * (x * x + y * y))) - Math.exp(.5 * (Math.cos(2 * Math.PI * x) + Math.cos(2 * Math.PI * y))) + Math.E + 20, opt: [[0, 0]] },
+    rastrigin: { lo: -5.12, hi: 5.12, f: (x, y) => 20 + x * x - 10 * Math.cos(2 * Math.PI * x) + y * y - 10 * Math.cos(2 * Math.PI * y), opt: [[0, 0]] },
+    himmelblau: { lo: -5, hi: 5, f: (x, y) => (x * x + y - 11) ** 2 + (x + y * y - 7) ** 2,
+      opt: [[3, 2], [-2.805118, 3.131312], [-3.779310, -3.283186], [3.584428, -1.848126]] }
+  };
+  let P = FN.ackley;
+  const map = $('map'), mctx = map.getContext('2d'), curve = $('curve'), cctx = curve.getContext('2d');
+  const S = 560; let bgImage = null;
+  const toPx = v => (v - P.lo) / (P.hi - P.lo) * S, toPy = v => S - (v - P.lo) / (P.hi - P.lo) * S;
+  function buildBackground() {
+    const img = mctx.createImageData(S, S); const vals = new Float32Array(S * S); let mx = 0;
+    for (let j = 0; j < S; j++) for (let i = 0; i < S; i++) {
+      const x = P.lo + (i + .5) / S * (P.hi - P.lo), y = P.hi - (j + .5) / S * (P.hi - P.lo);
+      const v = Math.log1p(P.f(x, y)); vals[j * S + i] = v; if (v > mx) mx = v; }
+    const sorted = Float32Array.from(vals).sort(); const N = sorted.length;
+    const rank = v => { let a = 0, b = N - 1; while (a < b) { const m = (a + b) >> 1; if (sorted[m] < v) a = m + 1; else b = m; } return Math.pow(a / N, .8); };
+    const stops = [[23, 91, 137], [57, 157, 177], [114, 197, 151], [247, 213, 113], [207, 93, 75]];
+    for (let p = 0; p < S * S; p++) {
+      const t = rank(vals[p]), s = Math.max(0, Math.min(3.999, t * 4)), a = Math.floor(s), r = s - a, c0 = stops[a], c1 = stops[a + 1];
+      for (let q = 0; q < 3; q++) img.data[p * 4 + q] = c0[q] + (c1[q] - c0[q]) * r; img.data[p * 4 + 3] = 255; }
+    bgImage = img; }
+
+  let X, V, PB, PBF, gb, gbf, it, hist, trails, R, focus = 0, playing = false, timer = null;
+  const prm = () => ({ n: +$('n').value, w: +$('w').value / 100, c1: +$('c1').value / 100, c2: +$('c2').value / 100 });
+  const clamp = v => Math.max(P.lo, Math.min(P.hi, v));
+  function drawR() { R = X.map(() => [rand(), rand()]); }          // les tirages du prochain pas, connus d'avance
+  function reset() {
+    P = FN[$('fn').value]; buildBackground(); seedState = (+$('seed').value || 1) >>> 0;
+    const n = prm().n, span = P.hi - P.lo;
+    X = Array.from({ length: n }, () => [P.lo + rand() * span, P.lo + rand() * span]);
+    V = X.map(() => [(rand() * 2 - 1) * span / 16, (rand() * 2 - 1) * span / 16]);
+    PB = X.map(p => p.slice()); PBF = X.map(p => P.f(p[0], p[1]));
+    const b = PBF.indexOf(Math.min(...PBF)); gb = PB[b].slice(); gbf = PBF[b];
+    it = 0; hist = [gbf]; trails = X.map(p => [p.slice()]); focus = Math.min(focus, n - 1);
+    drawR(); draw(); explain(); }
+  function parts(i) {
+    const { w, c1, c2 } = prm(), x = X[i], v = V[i], [r1, r2] = R[i];
+    return [[w * v[0], w * v[1]], [c1 * r1 * (PB[i][0] - x[0]), c1 * r1 * (PB[i][1] - x[1])], [c2 * r2 * (gb[0] - x[0]), c2 * r2 * (gb[1] - x[1])]]; }
+  function step() {
+    const vmax = (P.hi - P.lo) / 4;
+    for (let i = 0; i < X.length; i++) {
+      const [a, b, c] = parts(i);
+      V[i] = [a[0] + b[0] + c[0], a[1] + b[1] + c[1]].map(v => Math.max(-vmax, Math.min(vmax, v)));
+      X[i] = [clamp(X[i][0] + V[i][0]), clamp(X[i][1] + V[i][1])];
+      const f = P.f(X[i][0], X[i][1]); if (f < PBF[i]) { PBF[i] = f; PB[i] = X[i].slice(); }
+      trails[i].push(X[i].slice()); if (trails[i].length > 4) trails[i].shift(); }
+    const b = PBF.indexOf(Math.min(...PBF)); gb = PB[b].slice(); gbf = PBF[b];
+    it++; hist.push(gbf); drawR(); }
+  function arrow(x0, y0, x1, y1, col, lw) {
+    const a = toPx(x0), b = toPy(y0), c = toPx(x1), d = toPy(y1), ang = Math.atan2(d - b, c - a), L = Math.hypot(c - a, d - b);
+    mctx.strokeStyle = col; mctx.fillStyle = col; mctx.lineWidth = lw; mctx.beginPath(); mctx.moveTo(a, b); mctx.lineTo(c, d); mctx.stroke();
+    if (L > 6) { mctx.beginPath(); mctx.moveTo(c, d); mctx.lineTo(c - 11 * Math.cos(ang - .4), d - 11 * Math.sin(ang - .4)); mctx.lineTo(c - 11 * Math.cos(ang + .4), d - 11 * Math.sin(ang + .4)); mctx.closePath(); mctx.fill(); } }
+  function dot(x, y, r, fill, stroke = 'rgba(255,255,255,.9)', lw = 1.5) {
+    mctx.beginPath(); mctx.arc(toPx(x), toPy(y), r, 0, 2 * Math.PI); mctx.fillStyle = fill; mctx.fill(); if (stroke) { mctx.lineWidth = lw; mctx.strokeStyle = stroke; mctx.stroke(); } }
+  function draw() {
+    mctx.putImageData(bgImage, 0, 0);
+    // Courbes de niveau : même principe qu'une carte topographique.
+    // Chaque ligne relie des points de coût comparable ; les creux sont les vallées recherchées.
+    const grid=56, levels=[0.7,1.15,1.65,2.2,2.85,3.55,4.4,5.4];
+    const values=[];
+    for(let j=0;j<=grid;j++){let row=[];for(let i=0;i<=grid;i++){
+      const x=P.lo+i/grid*(P.hi-P.lo),y=P.hi-j/grid*(P.hi-P.lo);
+      row.push(Math.log1p(P.f(x,y)));}values.push(row);}
+    mctx.save();mctx.strokeStyle='rgba(35,25,58,.37)';mctx.lineWidth=1.05;
+    for(const level of levels){mctx.beginPath();for(let j=0;j<grid;j++)for(let i=0;i<grid;i++){
+      const corners=[[i,j,values[j][i]],[i+1,j,values[j][i+1]],[i+1,j+1,values[j+1][i+1]],[i,j+1,values[j+1][i]]];
+      const edges=[[0,1],[1,2],[2,3],[3,0]],hits=[];
+      for(const [a,b] of edges){const A=corners[a],B=corners[b];if((A[2]<level)!==(B[2]<level)){
+        const t=(level-A[2])/(B[2]-A[2]);hits.push([(A[0]+t*(B[0]-A[0]))*S/grid,(A[1]+t*(B[1]-A[1]))*S/grid]);}}
+      if(hits.length>=2){mctx.moveTo(...hits[0]);mctx.lineTo(...hits[1]);if(hits.length===4){mctx.moveTo(...hits[2]);mctx.lineTo(...hits[3]);}}
+    }mctx.stroke();}mctx.restore();
+    for (const o of P.opt) { mctx.save(); mctx.translate(toPx(o[0]), toPy(o[1])); mctx.fillStyle = '#E8A33D'; mctx.strokeStyle = '#3B1A55'; mctx.lineWidth = 1;
+      mctx.beginPath(); for (let i = 0; i < 10; i++) { const r = i % 2 ? 4 : 9, a = -Math.PI / 2 + i * Math.PI / 5; mctx.lineTo(r * Math.cos(a), r * Math.sin(a)); }
+      mctx.closePath(); mctx.fill(); mctx.stroke(); mctx.restore(); }
+    if ($('trail').checked) { mctx.lineWidth = 1.2; mctx.strokeStyle = 'rgba(255,255,255,.7)';
+      for (const t of trails) { mctx.beginPath(); t.forEach((p, k) => k ? mctx.lineTo(toPx(p[0]), toPy(p[1])) : mctx.moveTo(toPx(p[0]), toPy(p[1]))); mctx.stroke(); } }
+    X.forEach((p, i) => dot(p[0], p[1], i === focus && $('dec').checked ? 7 : 5, '#FFFFFF', '#2A1838', 1.6));
+    mctx.beginPath(); mctx.arc(toPx(gb[0]), toPy(gb[1]), 11, 0, 2 * Math.PI); mctx.lineWidth = 3; mctx.strokeStyle = '#C01680'; mctx.stroke();
+    if ($('dec').checked) {
+      const i = focus, x = X[i], [a, b, c] = parts(i);
+      // souvenir de l'oiseau suivi
+      const pb = PB[i]; mctx.save(); mctx.translate(toPx(pb[0]), toPy(pb[1])); mctx.strokeStyle = '#2F6FA3'; mctx.lineWidth = 2.5;
+      mctx.beginPath(); mctx.moveTo(-7, -7); mctx.lineTo(7, 7); mctx.moveTo(7, -7); mctx.lineTo(-7, 7); mctx.stroke(); mctx.restore();
+      let cx = x[0], cy = x[1];
+      [[a, '#8E949C'], [b, '#2F6FA3'], [c, '#D97706']].forEach(([v, col]) => { arrow(cx, cy, cx + v[0], cy + v[1], col, 3.5); cx += v[0]; cy += v[1]; });
+      mctx.setLineDash([6, 5]); arrow(x[0], x[1], cx, cy, '#2A1838', 1.5); mctx.setLineDash([]);
+      dot(x[0], x[1], 8, '#FFFFFF', '#2A1838', 2.5);
+    }
+    $('sGen').textContent = it; $('sBest').textContent = fmt(gbf);
+    const cx = X.reduce((s, p) => s + p[0], 0) / X.length, cy = X.reduce((s, p) => s + p[1], 0) / X.length;
+    $('sMean').textContent = fmt(Math.sqrt(X.reduce((s, p) => s + (p[0] - cx) ** 2 + (p[1] - cy) ** 2, 0) / X.length));
+    drawCurve(); }
+  function drawCurve() {
+    const dpr = window.devicePixelRatio || 1, w = curve.clientWidth, h = curve.clientHeight;
+    curve.width = w * dpr; curve.height = h * dpr; cctx.setTransform(dpr, 0, 0, dpr, 0, 0); cctx.clearRect(0, 0, w, h);
+    const ink = css('--muted'), line = css('--line'), pink = css('--pink');
+    const L = 34, Rm = 8, T = 8, Bm = 20, G = Math.max(10, hist.length - 1);
+    const all = hist.map(v => Math.log10(v + 1e-9)); let lo = Math.floor(Math.min(...all)), hi = Math.ceil(Math.max(...all)); if (hi === lo) hi = lo + 1;
+    const Xc = g => L + g / G * (w - L - Rm), Yc = v => T + (hi - Math.log10(v + 1e-9)) / (hi - lo) * (h - T - Bm);
+    cctx.font = '11px ' + css('--font-body'); cctx.fillStyle = ink; cctx.strokeStyle = line; cctx.lineWidth = 1;
+    const step = Math.max(1, Math.ceil((hi - lo) / 4));
+    for (let e = lo; e <= hi; e += step) { const y = T + (hi - e) / (hi - lo) * (h - T - Bm); cctx.beginPath(); cctx.moveTo(L, y); cctx.lineTo(w - Rm, y); cctx.stroke();
+      cctx.fillText(e === 0 ? '1' : (e === 1 ? '10' : '10^' + e).replace('-', '−'), 2, y + 4); }
+    cctx.fillText('itération ' + (hist.length - 1), w - Rm - 80, h - 5);
+    cctx.strokeStyle = pink; cctx.lineWidth = 2; cctx.beginPath(); hist.forEach((v, g) => g ? cctx.lineTo(Xc(g), Yc(v)) : cctx.moveTo(Xc(g), Yc(v))); cctx.stroke();
+    cctx.fillStyle = pink; cctx.fillText('meilleur coût du groupe', L + 4, h - 5); }
+  function explain() {
+    const { w, c1, c2 } = prm(), [r1, r2] = R[focus];
+    $('explain').innerHTML = it === 0
+      ? `<b>Départ.</b> Les oiseaux sont lâchés au hasard, avec une vitesse au hasard. Le cercle rose marque le meilleur endroit trouvé par le groupe ; la croix bleue, le meilleur souvenir de l'oiseau suivi.`
+      : `<b>Itération ${it}.</b> Pour l'oiseau suivi, le prochain pas additionne : 1. l'inertie (w = ${fmt(w)}) ; 2. le retour vers son souvenir (c1 = ${fmt(c1)}, tirage r1 = ${fmt(r1)}) ; 3. l'attraction du groupe (c2 = ${fmt(c2)}, tirage r2 = ${fmt(r2)}). Les pointillés montrent la somme : c'est là qu'il sera à l'itération ${it + 1}.`; }
+  $('step').onclick = () => { stop(); step(); draw(); explain(); };
+  $('reset').onclick = () => { stop(); reset(); };
+  function stop() { playing = false; clearInterval(timer); $('play').textContent = 'Lecture'; }
+  $('play').onclick = () => { if (playing) return stop(); playing = true; $('play').textContent = 'Pause';
+    timer = setInterval(() => { step(); draw(); explain(); if (it >= 400) stop(); }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 600 : 160); };
+  const out = { n: ['oN', v => v], w: ['oW', v => (v / 100).toFixed(2).replace('.', ',')], c1: ['oC1', v => (v / 100).toFixed(2).replace('.', ',')], c2: ['oC2', v => (v / 100).toFixed(2).replace('.', ',')] };
+  for (const [id, [o, f]] of Object.entries(out)) $(id).addEventListener('input', e => { $(o).textContent = f(e.target.value); if (id === 'n') { stop(); reset(); } else { draw(); explain(); } });
+  $('fn').onchange = () => { stop(); reset(); }; $('seed').onchange = () => { stop(); reset(); };
+  $('dec').onchange = draw; $('trail').onchange = draw;
+  map.addEventListener('click', e => { const r = map.getBoundingClientRect(), sx = (e.clientX - r.left) / r.width * S, sy = (e.clientY - r.top) / r.height * S;
+    let best = 0, bd = Infinity; X.forEach((p, i) => { const d = (toPx(p[0]) - sx) ** 2 + (toPy(p[1]) - sy) ** 2; if (d < bd) { bd = d; best = i; } });
+    focus = best; $('dec').checked = true; draw(); explain(); });
+  window.addEventListener('resize', drawCurve);
+  reset();
+})();
+</script>
+</body>
+</html>
