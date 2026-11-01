@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vigie du ciel — jumeau temps réel</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root{
+    --bg:#070b11; --panel:#0e1722; --panel2:#111c29; --line:#1d2b3c;
+    --ink:#e8eef5; --dim:#7e90a4; --accent:#46d3a3;
+    --red:#ff3b6b; --amber:#ffb02e; --green:#46d3a3; --idle:#37485c;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:"Segoe UI",system-ui,sans-serif; overflow:hidden;
+  }
+  .wrap{display:flex; flex-direction:column; height:100vh;}
+  .top{
+    display:flex; align-items:center; gap:.8rem; padding:.7rem 1.1rem;
+    border-bottom:1px solid var(--line); flex:0 0 auto;
+  }
+  .top h1{
+    margin:0; font-size:1rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase;
+  }
+  .top h1 .dot{color:var(--accent); animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .clock{margin-left:auto; color:var(--dim); font-size:.82rem; font-variant-numeric:tabular-nums;}
+  .ctrl{
+    background:transparent; color:var(--ink); border:1px solid var(--line);
+    border-radius:6px; padding:.32rem .7rem; font-size:.8rem; cursor:pointer;
+  }
+  .ctrl:hover{background:var(--panel2);}
+  .grid{display:grid; grid-template-columns:1.55fr 1fr; flex:1 1 auto; min-height:0;}
+  .sky{position:relative; background:#0c1622;
+    border-right:1px solid var(--line); overflow:hidden;}
+  #map{position:absolute; inset:0; z-index:1; background:#0c1622;}
+  #cv{position:absolute; inset:0; z-index:2; pointer-events:none; display:block; width:100%; height:100%;}
+  .skylabel{
+    position:absolute; top:.6rem; left:.8rem; z-index:3; font-size:.72rem; letter-spacing:.12em;
+    text-transform:uppercase; color:#33536e; background:rgba(245,247,250,.7);
+    padding:.15rem .45rem; border-radius:4px;
+  }
+  .leaflet-container{font-family:inherit;}
+  /* Fond de carte assombri et désaturé pour s'accorder à l'interface sombre.
+     Variante fond clair : filter:grayscale(1) brightness(1.06) contrast(.9) opacity(.6); */
+  .leaflet-tile-pane{filter:none;}
+  .leaflet-container{background:#0a1420;}
+  .leaflet-control-attribution{font-size:9px!important;background:rgba(5,12,20,.75)!important;color:#d9e5ef!important;}
+  .leaflet-control-attribution a{color:#b5dbff!important;}
+  .side{display:flex; flex-direction:column; min-height:0;}
+  .agents{padding:.9rem 1rem; border-bottom:1px solid var(--line);}
+  .agents h2,.feed h2,.bulletin h2{
+    font-size:.7rem; text-transform:uppercase; letter-spacing:.13em;
+    color:var(--dim); margin:0 0 .7rem;
+  }
+  .pipe{display:flex; align-items:stretch; gap:.4rem;}
+  .agent{
+    flex:1; background:var(--panel); border:1px solid var(--line); border-radius:8px;
+    padding:.55rem .5rem; text-align:center; position:relative; transition:all .25s;
+  }
+  .agent .ic{font-size:1.1rem; line-height:1;}
+  .agent .nm{font-size:.66rem; margin-top:.25rem; color:var(--dim); letter-spacing:.03em;}
+  .agent.act{border-color:var(--accent); background:var(--panel2); box-shadow:0 0 0 1px var(--accent) inset;}
+  .agent.act .nm{color:var(--accent);}
+  .arrow{align-self:center; color:var(--line); font-size:.9rem;}
+  .feed{flex:1 1 auto; padding:.9rem 1rem; overflow:auto; min-height:0;}
+  .ev{
+    display:flex; gap:.5rem; align-items:flex-start; font-size:.82rem;
+    padding:.35rem 0; border-bottom:1px solid #14202e;
+  }
+  .ev .tg{
+    font-size:.6rem; text-transform:uppercase; letter-spacing:.05em; padding:.1rem .4rem;
+    border-radius:99px; border:1px solid; white-space:nowrap; margin-top:.1rem;
+  }
+  .tg.collecteur{color:#7fb2ff;border-color:#7fb2ff44;}
+  .tg.analyste{color:var(--amber);border-color:#ffb02e44;}
+  .tg.verificateur{color:var(--accent);border-color:#46d3a344;}
+  .tg.redacteur{color:#d39cff;border-color:#d39cff44;}
+  .ev .txt{color:var(--ink); opacity:.92;}
+  .ev .txt b{color:#fff;}
+  .bulletin{padding:.9rem 1rem; border-top:1px solid var(--line); flex:0 0 auto;}
+  .bulletin .card{
+    background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--accent);
+    border-radius:6px; padding:.7rem .8rem; font-size:.9rem; min-height:3.2rem;
+    transition:border-color .3s;
+  }
+  .bulletin .card.alert{border-left-color:var(--red);}
+  .stat{display:flex; gap:1.1rem; margin-top:.5rem; font-size:.74rem; color:var(--dim);}
+  .stat b{color:var(--ink); font-variant-numeric:tabular-nums;}
+
+  .help{
+    background:transparent; color:var(--dim); border:1px solid var(--line);
+    border-radius:50%; width:1.7rem; height:1.7rem; font-size:.85rem; cursor:pointer;
+  }
+  .help:hover{background:var(--panel2); color:var(--ink);}
+  .intro-back{
+    position:absolute; inset:0; z-index:50; background:rgba(4,7,11,.72);
+    display:flex; align-items:center; justify-content:center; padding:1.5rem;
+  }
+  .intro{
+    max-width:560px; background:var(--panel2); border:1px solid var(--line);
+    border-radius:12px; padding:1.4rem 1.6rem; box-shadow:0 18px 50px rgba(0,0,0,.5);
+  }
+  .intro h2{margin:0 0 .2rem; font-size:1.05rem; letter-spacing:.04em;}
+  .intro .sub{color:var(--dim); font-size:.86rem; margin:0 0 1rem;}
+  .intro .roles{display:flex; flex-direction:column; gap:.55rem; margin:0 0 1.1rem;}
+  .intro .role{display:flex; gap:.65rem; align-items:flex-start; font-size:.9rem;}
+  .intro .role .ic{font-size:1.1rem; line-height:1.2; flex:0 0 1.4rem; text-align:center;}
+  .intro .role b{font-weight:600;}
+  .intro .role span{color:var(--dim);}
+  .intro .tick{
+    background:var(--panel); border:1px solid var(--line); border-radius:6px;
+    padding:.5rem .7rem; font-size:.82rem; color:var(--dim); margin:0 0 1.1rem;
+  }
+  .intro .tick b{color:var(--accent);}
+  .intro .go{
+    background:var(--accent); color:#04241b; border:none; border-radius:7px;
+    padding:.55rem 1.1rem; font-size:.92rem; font-weight:600; cursor:pointer;
+  }
+  .intro .go:hover{filter:brightness(1.08);}
+  .hidden{display:none !important;}
+
+  /* ---- bandeau de mode et panneau « Rédacteur » ---- */
+  .chips{display:flex; gap:.4rem; align-items:center; flex-wrap:wrap;}
+  .chip{display:inline-flex; align-items:center; gap:.35rem; background:var(--panel2);
+        border:1px solid var(--line); border-radius:999px; padding:.22rem .6rem;
+        font-size:.72rem; color:var(--dim); white-space:nowrap;}
+  .chip b{color:var(--ink); font-weight:600;}
+  .chip .pt{width:.5rem; height:.5rem; border-radius:50%; background:var(--dim);}
+  .chip.sim .pt{background:#8a7fd6;}
+  .chip.llm .pt{background:#e8a33a;}
+  .chip.off .pt{background:var(--dim);}
+  .panel-back{position:fixed; inset:0; background:rgba(4,8,13,.86); display:flex;
+              align-items:center; justify-content:center; z-index:60;}
+  .panel-back.hidden{display:none;}
+  .cfg{background:var(--panel); border:1px solid var(--line); border-radius:12px;
+       padding:1.2rem 1.4rem; max-width:580px; width:92%; max-height:88%; overflow:auto;}
+  .cfg h2{margin:0 0 .2rem; font-size:1.05rem;}
+  .cfg .sub{margin:0 0 .9rem; color:var(--dim); font-size:.82rem; line-height:1.55;}
+  .cfg .opt{border:1px solid var(--line); border-radius:8px; padding:.6rem .75rem; margin-bottom:.5rem;}
+  .cfg .opt.on{border-color:var(--accent);}
+  .cfg .opt label{display:flex; gap:.5rem; align-items:flex-start; cursor:pointer; font-size:.88rem;}
+  .cfg .opt .desc{color:var(--dim); font-size:.76rem; margin:.25rem 0 0 1.45rem; line-height:1.5;}
+  .cfg .champs{margin:.55rem 0 0 1.45rem; display:none; gap:.4rem; flex-direction:column;}
+  .cfg .opt.on .champs{display:flex;}
+  .cfg input[type=text], .cfg input[type=password]{background:var(--panel2); color:var(--ink);
+       border:1px solid var(--line); border-radius:6px; padding:.32rem .5rem; font-size:.78rem; width:100%;}
+  .cfg .avert{color:#e8a33a; font-size:.72rem; margin-top:.35rem; line-height:1.5;}
+  .cfg .bas{display:flex; gap:.5rem; align-items:center; margin-top:.9rem;}
+  .cfg .diag{margin-top:.75rem; font-size:.76rem; color:var(--dim); line-height:1.6;
+             white-space:pre-wrap; border-left:2px solid var(--line); padding-left:.65rem; display:none;}
+  .cfg .diag.on{display:block;}
+  .cfg code{background:var(--panel2); padding:.08rem .32rem; border-radius:4px; font-size:.74rem;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1><span class="dot">●</span> Vigie du ciel — jumeau temps réel</h1>
+    <button class="ctrl" id="toggle">Pause</button>
+    <button class="help" id="help" aria-label="Aide" title="À propos de cette démo">?</button>
+    <span class="chips">
+      <span class="chip sim" id="chip-donnees" title="Cliquer pour changer de source" style="cursor:pointer"><span class="pt"></span>Données <b>simulées</b></span>
+      <span class="chip off" id="chip-redac"><span class="pt"></span>Rédaction <b>gabarit</b></span>
+    </span>
+    <button class="ctrl" id="layerBtn" title="Changer le fond de carte">Vue carte</button>
+    <button class="ctrl" id="mapModeBtn" title="Basculer entre carte en ligne et plan local">Carte locale</button>
+    <button class="ctrl" id="cfgBtn">Rédacteur…</button>
+    <span class="clock" id="clock">--:--:--</span>
+  </div>
+  <div class="grid">
+    <div class="sky">
+      <span class="skylabel zonelabel">Région parisienne · trafic simulé</span>
+      <div id="map"></div>
+      <canvas id="cv"></canvas>
+      <div class="intro-back" id="introBack">
+        <div class="intro">
+          <h2>Vous regardez une équipe d'agents au travail</h2>
+          <p class="sub">Surveillance du trafic aérien au-dessus de la région parisienne, analysée en continu.
+          <b>Le trafic est réel</b> quand une source publique ADS-B répond (adsb.lol via Cloudflare, sans clé ni inscription, via un relais Cloudflare) : ce sont des positions d’avions transmises par le réseau ADS-B, avec une latence possible. Si aucune source n'est joignable, la page bascule sur un trafic simulé et le signale dans le journal. La pastille « Données » en haut permet de forcer la simulation, utile pour voir des anomalies à coup sûr.</p>
+          <div class="roles">
+            <div class="role"><span class="ic">📡</span><div><b>Collecteur</b> — <span>relève la position de chaque avion, en boucle.</span></div></div>
+            <div class="role"><span class="ic">🧮</span><div><b>Analyste</b> — <span>repère les comportements inhabituels par le calcul : vol en cercle, altitude anormale, code d'urgence. Aucune IA ici.</span></div></div>
+            <div class="role"><span class="ic">🔎</span><div><b>Vérificateur</b> — <span>confirme les alertes et les classe par gravité.</span></div></div>
+            <div class="role"><span class="ic">✍️</span><div><b>Rédacteur</b> — <span>met les faits en récit dans le bulletin. C'est le <b>seul</b> point de la chaîne où un modèle de langage peut intervenir. Par défaut il rédige sans IA, par gabarit ; le bouton « Rédacteur… » permet d'y brancher un modèle et de comparer.</span></div></div>
+          </div>
+          <p class="tick">Toutes les <b>2 secondes</b>, l'équipe rejoue ce cycle au complet (le flux réel est relu toutes les 12 secondes) : le panneau de droite montre, en direct, qui agit et ce qu'il trouve.</p>
+          <button class="go" id="introGo">Lancer la surveillance</button>
+        </div>
+      </div>
+    </div>
+    <div class="side">
+      <div class="agents">
+        <h2>Équipe d'agents</h2>
+        <div class="pipe">
+          <div class="agent" id="ag-collecteur"><div class="ic">📡</div><div class="nm">Collecteur</div></div>
+          <div class="arrow">›</div>
+          <div class="agent" id="ag-analyste"><div class="ic">🧮</div><div class="nm">Analyste</div></div>
+          <div class="arrow">›</div>
+          <div class="agent" id="ag-verificateur"><div class="ic">🔎</div><div class="nm">Vérificateur</div></div>
+          <div class="arrow">›</div>
+          <div class="agent" id="ag-redacteur"><div class="ic">✍️</div><div class="nm">Rédacteur</div></div>
+        </div>
+      </div>
+      <div class="feed">
+        <h2>Journal d'activité</h2>
+        <div id="feed"></div>
+      </div>
+      <div class="bulletin">
+        <h2>Bulletin</h2>
+        <div class="card" id="bulletin">Surveillance en cours…</div>
+        <div class="stat">
+          <span>Cycle <b id="s-cycle">0</b></span>
+          <span>Avions <b id="s-avions">0</b></span>
+          <span>Suspects <b id="s-suspects">0</b></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- ============ panneau de choix du moteur de rédaction ============ -->
+<div class="panel-back hidden" id="cfgBack">
+  <div class="cfg">
+    <h2>Qui rédige le bulletin ?</h2>
+    <p class="sub">Les trois premiers rôles — collecter, analyser, vérifier — sont du calcul
+    pur et ne changent pas. Seule la rédaction finale peut passer par un modèle de langage.
+    Changez de mode et comparez : les faits détectés restent identiques, seule la formulation
+    varie. Les données, elles, ne dépendent pas de ce choix.</p>
+
+    <div class="opt on" id="opt-gabarit">
+      <label><input type="radio" name="redacMode" value="gabarit" checked>
+        <span><b>Gabarit</b> — aucun modèle de langage</span></label>
+      <div class="desc">Le bulletin est assemblé par des phrases à trous. Fonctionne partout,
+      hors ligne, instantanément. C'est le mode par défaut, et il suffit à démontrer que la
+      chaîne produit un résultat sans IA générative.</div>
+    </div>
+
+    <div class="opt" id="opt-local">
+      <label><input type="radio" name="redacMode" value="local">
+        <span><b>Modèle local</b> — Ollama sur votre machine</span></label>
+      <div class="desc">Aucune clé, aucun coût, rien ne sort de la machine.</div>
+      <div class="champs">
+        <input type="text" id="f-ollamaUrl" value="http://localhost:11434" placeholder="URL d'Ollama">
+        <input type="text" id="f-ollamaModele" value="llama3.2" placeholder="nom du modèle">
+      </div>
+    </div>
+
+    <div class="opt" id="opt-distant">
+      <label><input type="radio" name="redacMode" value="distant">
+        <span><b>Modèle distant</b> — API compatible OpenAI</span></label>
+      <div class="desc">Pour comparer avec un modèle plus grand.</div>
+      <div class="champs">
+        <input type="text" id="f-apiUrl" value="https://api.openai.com/v1/chat/completions" placeholder="URL de l'API">
+        <input type="text" id="f-apiModele" value="gpt-4o-mini" placeholder="nom du modèle">
+        <input type="password" id="f-apiCle" placeholder="clé d'API">
+        <div class="avert">La clé reste en mémoire dans cet onglet : elle n'est ni enregistrée,
+        ni envoyée ailleurs qu'à l'API que vous indiquez. Elle disparaît au rechargement.
+        À n'utiliser que sur votre propre machine.</div>
+      </div>
+    </div>
+
+    <div class="bas">
+      <button class="ctrl" id="cfgTest">Tester la connexion</button>
+      <button class="ctrl" id="cfgClose">Fermer</button>
+    </div>
+    <div class="diag" id="cfgDiag"></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+"use strict";
+
+/* ---------- moteur de ciel : un petit jumeau numérique ----------
+   Chaque avion a une position, un cap, une vitesse. La plupart volent droit.
+   De temps en temps, l'un d'eux bascule en comportement anormal :
+   - cercle (le cap tourne en continu)
+   - urgence (squawk 7700)
+   Le moteur ne "sait" pas qu'il crée une anomalie : ce sont les AGENTS
+   qui la détectent, par calcul, exactement comme dans le code Python.       */
+
+const SKY = {
+  W: 0, H: 0, planes: [],
+  pays: ["France","Germany","Ireland","United Kingdom","Sweden","Spain","Italy"],
+  prefixes: ["AFR","DLH","RYR","BAW","SAS","IBE","AZA"],
+};
+
+/* Zone géographique réelle (région parisienne).
+   Les coordonnées normalisées 0..1 du moteur sont projetées dans cette boîte,
+   puis converties en pixels-écran via Leaflet. */
+const GEO = { latN: 49.10, latS: 48.50, lonW: 1.80, lonE: 2.90 };
+function normToLatLon(x, y){
+  // x:0..1 -> ouest..est ; y:0..1 -> nord..sud
+  return [GEO.latN + (GEO.latS - GEO.latN) * y,
+          GEO.lonW + (GEO.lonE - GEO.lonW) * x];
+}
+let MAP = null, mapOK = false;
+
+function rnd(a,b){return a+Math.random()*(b-a);}
+function makePlane(id){
+  return {
+    id,
+    callsign: SKY.prefixes[id%SKY.prefixes.length] + Math.floor(rnd(100,999)),
+    pays: SKY.pays[id%SKY.pays.length],
+    x: rnd(0.08,0.92), y: rnd(0.08,0.92),     // position normalisée 0..1
+    cap: rnd(0,360), vit: rnd(0.0008,0.0016),
+    alt: Math.round(rnd(8000,12000)),
+    squawk: "1000",
+    mode: "normal",                            // normal | cercle | urgence
+    modeT: 0,
+    capHist: [],
+    trail: [],                                 // positions récentes (pour la traînée)
+  };
+}
+
+function initSky(n){
+  SKY.planes = [];
+  for(let i=0;i<n;i++) SKY.planes.push(makePlane(i));
+}
+
+function stepSky(){
+  for(const p of SKY.planes){
+    // déclenchement aléatoire d'une anomalie sur un avion "normal"
+    if(p.mode==="normal" && Math.random()<0.012){
+      if(Math.random()<0.5){ p.mode="cercle"; p.modeT=rnd(8,16); p.alt=Math.round(rnd(900,1600)); }
+      else { p.mode="urgence"; p.modeT=rnd(6,12); p.squawk="7700"; }
+    }
+    if(p.mode!=="normal"){
+      p.modeT-=1;
+      if(p.modeT<=0){ p.mode="normal"; p.squawk="1000"; p.alt=Math.round(rnd(8000,12000)); }
+    }
+    // dynamique selon le mode
+    if(p.mode==="cercle"){ p.cap=(p.cap+34)%360; }        // le cap tourne vite -> cercle
+    else { p.cap=(p.cap+rnd(-3,3)+360)%360; }              // léger lacet naturel
+    // avance
+    const r=p.cap*Math.PI/180;
+    p.x+=Math.sin(r)*p.vit; p.y-=Math.cos(r)*p.vit;
+    // rebond doux aux bords
+    if(p.x<0.04||p.x>0.96){ p.cap=(540-p.cap)%360; p.x=Math.max(0.04,Math.min(0.96,p.x)); }
+    if(p.y<0.04||p.y>0.96){ p.cap=(360-p.cap)%360; p.y=Math.max(0.04,Math.min(0.96,p.y)); }
+    // mémoire de cap (pour la détection de tournoiement par l'analyste)
+    p.capHist.push(p.cap); if(p.capHist.length>5) p.capHist.shift();
+    // mémoire de position (pour la traînée visuelle)
+    p.trail.push([p.x,p.y]); if(p.trail.length>18) p.trail.shift();
+  }
+}
+
+
+/* ====================== SOURCE EN DIRECT (ADS-B public) ======================
+   Trois services publics, sans clé, interrogeables depuis le navigateur :
+   adsb.lol, airplanes.live, puis OpenSky (accès anonyme restreint). Le premier
+   qui répond gagne. En cas d'échec de tous, la page bascule sur la simulation
+   et le dit dans le journal : jamais en silence.                             */
+const SOURCE = { mode:"auto", live:false, label:"simulées", provider:"", lastOk:0, pending:false, echecs:0 };
+const CENTRE = { lat:(GEO.latN+GEO.latS)/2, lon:(GEO.lonW+GEO.lonE)/2, nm:40 };
+const LIVE = { planes:new Map() };   // hex -> état normalisé (callsign, x, y, alt, cap, squawk, capHist, trail)
+
+function paysDepuisHex(hex){
+  const h=parseInt((hex||"").slice(0,2),16); if(isNaN(h)) return "—";
+  if(h>=0x38&&h<=0x3B) return "France"; if(h>=0x3C&&h<=0x3F) return "Germany"; if(h>=0x40&&h<=0x43) return "United Kingdom";
+  if(h>=0x30&&h<=0x33) return "Italy"; if(h>=0x34&&h<=0x37) return "Spain"; if(h===0x48) return "Netherlands";
+  if(h===0x4B) return "Switzerland"; if(h===0x44) return "Belgium"; if(h===0x4C) return "Ireland"; if(h>=0x4A&&h<=0x4A) return "Sweden";
+  if(h>=0xA0&&h<=0xAF) return "United States"; if(h>=0xC0&&h<=0xC3) return "Canada"; if(h===0x45) return "Portugal"; if(h===0x47) return "Norway";
+  if(h===0x46) return "Finland"; if(h>=0x49&&h<=0x49) return "Poland"; return "—";
+}
+function latLonToNorm(lat,lon){
+  return [ (lon-GEO.lonW)/(GEO.lonE-GEO.lonW), (lat-GEO.latN)/(GEO.latS-GEO.latN) ];
+}
+async function fetchJson(url, ms){
+  const ctl=new AbortController(); const t=setTimeout(()=>ctl.abort(), ms||6000);
+  try{ const r=await fetch(url,{signal:ctl.signal, headers:{"Accept":"application/json"}}); if(!r.ok) throw new Error("HTTP "+r.status); return await r.json(); }
+  finally{ clearTimeout(t); }
+}
+/* Relais Cloudflare public : données ADS-B réelles, sans serveur Python local. */
+const API_AVIONS = "https://vigie-ciel-api.frederic-ros.workers.dev/api/avions";
+const FOURNISSEURS = [
+  { nom:"Cloudflare / ADS-B", async get(){
+      const u = `${API_AVIONS}?lat=${CENTRE.lat}&lon=${CENTRE.lon}&dist=${CENTRE.nm}`;
+      const j = await fetchJson(u, 18000);
+      if(j.mode !== "reel" || !Array.isArray(j.ac)) throw new Error(j.error || "Réponse ADS-B non valide");
+      SOURCE.relaisProvider = j.source || "ADS-B";
+      return j.ac.filter(a => Number.isFinite(Number(a.lat)) && Number.isFinite(Number(a.lon)))
+        .map(a => ({
+          hex: String(a.hex || "").trim(),
+          callsign: String(a.flight || a.hex || "?").trim(),
+          pays: paysDepuisHex(a.hex),
+          lat: Number(a.lat), lon: Number(a.lon),
+          alt: a.alt_geom === "ground" || a.alt_baro === "ground" ? 0 :
+               Number.isFinite(Number(a.alt_geom)) ? Math.round(Number(a.alt_geom)*0.3048) :
+               Number.isFinite(Number(a.alt_baro)) ? Math.round(Number(a.alt_baro)*0.3048) : 0,
+          cap: Number.isFinite(Number(a.track)) ? Number(a.track) :
+               Number.isFinite(Number(a.true_heading)) ? Number(a.true_heading) : 0,
+          squawk: String(a.squawk || "")
+        })).filter(a => a.hex);
+  }}
+];
+async function collecteDirecte(){
+  if(SOURCE.pending) return; SOURCE.pending=true;
+  try{
+    for(const f of FOURNISSEURS){
+      try{
+        const liste=await f.get();
+        integrerReleve(liste.filter(a=>a.lat!=null && a.lon!=null));
+        if(!SOURCE.live || SOURCE.provider!==SOURCE.relaisProvider){ SOURCE.live=true; SOURCE.provider=SOURCE.relaisProvider||f.nom; majChipDonnees(); pushFeed("collecteur", `source en direct : <b>${SOURCE.provider}</b> · ${liste.length} appareils dans un rayon de ${CENTRE.nm} NM`); }
+        SOURCE.lastOk=Date.now(); SOURCE.echecs=0; majChipDonnees(); return;
+      }catch(e){ SOURCE.derniereErreur = e.message; console.warn("Flux ADS-B indisponible :", e); }
+    }
+    SOURCE.echecs++;
+    if(SOURCE.live || SOURCE.echecs===1){ SOURCE.live=false; SOURCE.provider=""; majChipDonnees(); pushFeed("collecteur", `relais Cloudflare ou source ADS-B indisponible → <b>simulation de secours</b>`); }
+  } finally { SOURCE.pending=false; }
+}
+function integrerReleve(liste){
+  const vus=new Set();
+  for(const a of liste){
+    const [x,y]=latLonToNorm(a.lat,a.lon);
+    if(x<-0.05||x>1.05||y<-0.05||y>1.05) continue;
+    vus.add(a.hex);
+    let p=LIVE.planes.get(a.hex);
+    if(!p){ p={id:a.hex, callsign:a.callsign||a.hex, pays:a.pays, x, y, cap:a.cap??0, vit:0, alt:a.alt??0, squawk:a.squawk||"", mode:"live", capHist:[], trail:[]}; LIVE.planes.set(a.hex,p); }
+    p.x=x; p.y=y; if(a.cap!=null) p.cap=a.cap; if(a.alt!=null) p.alt=a.alt; p.squawk=a.squawk||""; if(a.callsign) p.callsign=a.callsign;
+    p.capHist.push(p.cap); if(p.capHist.length>8) p.capHist.shift();   // 8 relevés ≈ 1 min 30 : un circuit d'attente tourne de plus de 120°
+    p.trail.push([x,y]); if(p.trail.length>18) p.trail.shift();
+    p.vuLe=Date.now();
+  }
+  for(const [hex,p] of LIVE.planes){ if(!vus.has(hex) && Date.now()-(p.vuLe||0)>90000) LIVE.planes.delete(hex); }
+}
+function majChipDonnees(){
+  const c=el("chip-donnees");
+  if(SOURCE.live){ c.className="chip llm"; c.innerHTML=`<span class="pt"></span>Données <b>en direct</b> · ${SOURCE.provider}`; }
+  else { c.className="chip sim"; c.innerHTML=`<span class="pt"></span>Données <b>${SOURCE.mode==="sim"?"simulées (choix)":"simulées"}</b>`; }
+  const lab=document.querySelector(".zonelabel"); if(lab) lab.textContent = SOURCE.live ? "RÉGION PARISIENNE · TRAFIC RÉEL (ADS-B)" : "RÉGION PARISIENNE · TRAFIC SIMULÉ";
+}
+setTimeout(()=>{ el("chip-donnees").addEventListener("click", ()=>{
+  SOURCE.mode = (SOURCE.mode==="sim") ? "auto" : "sim";
+  if(SOURCE.mode==="sim"){ SOURCE.live=false; pushFeed("collecteur","source : <b>simulation</b> (choix de l'utilisateur)"); }
+  else { pushFeed("collecteur","source : recherche d'un flux <b>en direct</b>…"); collecteDirecte(); }
+  majChipDonnees();
+}); },0);
+/* le collecteur lit la bonne source ; les autres agents ne changent pas */
+function planesCourants(){ return (SOURCE.mode!=="sim" && SOURCE.live) ? [...LIVE.planes.values()] : SKY.planes; }
+setInterval(()=>{ if(running && SOURCE.mode!=="sim") collecteDirecte(); }, 12000);
+
+/* ---------- l'équipe d'agents : une vraie boucle d'orchestration ----------
+   À chaque cycle : collecteur -> analyste -> vérificateur -> rédacteur.
+   La détection est PUREMENT algorithmique (pas de "magie").              */
+
+function diffCap(a,b){ let d=Math.abs(a-b)%360; return d>180?360-d:d; }
+
+function agentCollecteur(){
+  // "collecte" l'instantané du ciel et le normalise
+  return planesCourants().map(p=>({
+    callsign:p.callsign, pays:p.pays, x:p.x, y:p.y,
+    alt:p.alt, cap:p.cap, squawk:p.squawk, capHist:[...p.capHist],
+  }));
+}
+
+function agentAnalyste(snapshot){
+  // détecte les anomalies par calcul
+  const suspects=[];
+  for(const a of snapshot){
+    const anomalies=[];
+    if(a.squawk==="7700") anomalies.push({type:"urgence",grav:"haute",txt:"code transpondeur 7700 (urgence générale)"});
+    if(a.capHist.length>=3){
+      let cum=0; for(let i=0;i<a.capHist.length-1;i++) cum+=diffCap(a.capHist[i],a.capHist[i+1]);
+      if(cum>=120) anomalies.push({type:"tournoiement",grav:"moyenne",txt:`cap variant de ${Math.round(cum)}° (vol en cercle)`});
+    }
+    const seuilAlt = SOURCE.live ? 900 : 2000;   // en réel, les approches de CDG/Orly sous 2000 m sont normales
+    if(a.alt>0 && a.alt<=seuilAlt) anomalies.push({type:"altitude",grav:"faible",txt:`altitude ${a.alt} m inhabituelle`});
+    if(anomalies.length){ a.anomalies=anomalies; suspects.push(a); }
+  }
+  return suspects;
+}
+
+function agentVerificateur(suspects){
+  // trie par gravité (haute d'abord), garde les confirmés
+  const ordre={haute:0,moyenne:1,faible:2};
+  suspects.sort((u,v)=>Math.min(...u.anomalies.map(x=>ordre[x.grav]))-Math.min(...v.anomalies.map(x=>ordre[x.grav])));
+  return suspects;
+}
+
+function agentRedacteur(nbAvions, suspects){
+  if(!suspects.length) return {alert:false,
+    txt:`${nbAvions} appareils suivis. Aucun comportement inhabituel sur la période.`,
+    faits:`Zone : région parisienne (${SOURCE.live?"trafic réel ADS-B, source "+SOURCE.provider:"trafic simulé"}). Appareils suivis : ${nbAvions}. Aucun comportement inhabituel détecté sur la période.`};
+  const top=suspects[0];
+  const grav=top.anomalies[0].grav;
+  const quoi=top.anomalies.map(a=>a.txt).join(", ");
+  return {
+    alert: grav==="haute",
+    txt:`${nbAvions} appareils suivis, ${suspects.length} au comportement notable. ` +
+        `Le plus marquant : ${top.callsign} (${top.pays}) — ${quoi}.`,
+    faits:`Zone : région parisienne (${SOURCE.live?"trafic réel ADS-B, source "+SOURCE.provider:"trafic simulé"}). Appareils suivis : ${nbAvions}. Comportements notables : ${suspects.length}. `
+        + suspects.map(s=>`${s.callsign} (${s.pays}) : ${s.anomalies.map(a=>a.txt).join(", ")}, gravité ${s.anomalies[0].grav}`).join(" ; ") + "."
+  };
+}
+
+/* ---------- orchestration + rendu ---------- */
+
+let cycle=0, running=true, suspectsCourants=[];
+
+const el=id=>document.getElementById(id);
+function lightAgent(name){
+  el("ag-"+name).classList.add("act");
+  setTimeout(()=>el("ag-"+name).classList.remove("act"), 380);
+}
+function pushFeed(tag, html){
+  const f=el("feed");
+  const d=document.createElement("div");
+  d.className="ev";
+  d.innerHTML=`<span class="tg ${tag}">${tag}</span><span class="txt">${html}</span>`;
+  f.prepend(d);
+  while(f.children.length>14) f.removeChild(f.lastChild);
+}
+
+function runCycle(){
+  cycle++;
+  // 1. collecteur
+  lightAgent("collecteur");
+  const snap=agentCollecteur();
+  pushFeed("collecteur", `instantané du ciel · <b>${snap.length}</b> appareils`);
+
+  // 2. analyste (décalé pour qu'on voie la séquence)
+  setTimeout(()=>{
+    lightAgent("analyste");
+    const susp=agentAnalyste(snap);
+    if(susp.length) pushFeed("analyste", `anomalie repérée sur <b>${susp.length}</b> appareil(s)`);
+    else pushFeed("analyste", `ciel nominal`);
+
+    // 3. vérificateur
+    setTimeout(()=>{
+      lightAgent("verificateur");
+      const conf=agentVerificateur(susp);
+      suspectsCourants=conf;
+      if(conf.length){
+        const t=conf[0];
+        pushFeed("verificateur", `confirmé : <b>${t.callsign}</b> — ${t.anomalies[0].type}`);
+      }
+
+      // 4. rédacteur
+      setTimeout(()=>{
+        lightAgent("redacteur");
+        const b=agentRedacteur(snap.length, conf);
+        const card=el("bulletin");
+        card.textContent=b.txt;
+        card.classList.toggle("alert", b.alert);
+        reformuler(b.faits, card);
+        if(conf.length) pushFeed("redacteur", `bulletin mis à jour`);
+        el("s-cycle").textContent=cycle;
+        el("s-avions").textContent=snap.length;
+        el("s-suspects").textContent=conf.length;
+      },300);
+    },300);
+  },300);
+}
+
+/* ---------- dessin du ciel ---------- */
+const cv=el("cv"), ctx=cv.getContext("2d");
+let radarAngle=0;
+function resize(){
+  const r=cv.parentElement.getBoundingClientRect();
+  cv.width=r.width*devicePixelRatio; cv.height=r.height*devicePixelRatio;
+  SKY.W=cv.width; SKY.H=cv.height;
+  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  if(mapOK && MAP) MAP.invalidateSize();
+}
+window.addEventListener("resize", resize);
+
+function couleur(p){
+  if(p.mode==="urgence" || p.squawk==="7700") return "#ff3b6b";
+  if(p.mode==="cercle")  return "#e8920a";
+  if(p.alt>0&&p.alt<=(SOURCE.live?900:2000)) return "#0f9e75";
+  return "#66d9ff";
+}
+
+/* Projection coordonnées normalisées -> pixels écran.
+   Si la vraie carte est chargée : on passe par Leaflet (les avions
+   collent à la géographie et suivent zoom/déplacement).
+   Sinon : repli sur le radar stylisé (position * dimensions). */
+function proj(x, y, W, H){
+  if(mapOK && MAP){
+    const ll = normToLatLon(x, y);
+    const pt = MAP.latLngToContainerPoint([ll[0], ll[1]]);
+    return [pt.x, pt.y];
+  }
+  return [x*W, y*H];
+}
+
+/* Plan local schématique, sans dépendance réseau. Tracés illustratifs. */
+const SEINE=[[0.12,0.30],[0.26,0.40],[0.38,0.46],[0.46,0.55],[0.52,0.66],[0.60,0.74],[0.74,0.82],[0.90,0.92]];
+const ZONE=[[0.06,0.10],[0.94,0.08],[0.96,0.90],[0.10,0.94]];
+const AEROPORTS_STY=[{x:0.30,y:0.62,nom:"CDG"},{x:0.42,y:0.40,nom:"ORY"}];
+
+function drawDecorStylise(W,H){
+  ctx.fillStyle='#11212a';ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='#263e48';ctx.lineWidth=7;
+  for(let i=0;i<12;i++){
+    let x=W*i/10;ctx.beginPath();ctx.moveTo(x-50,0);ctx.bezierCurveTo(x+30,H*.3,x-35,H*.7,x+50,H);ctx.stroke();
+  }
+  for(let i=0;i<9;i++){
+    let y=H*i/8;ctx.beginPath();ctx.moveTo(0,y);ctx.bezierCurveTo(W*.3,y+25,W*.7,y-20,W,y+10);ctx.stroke();
+  }
+  ctx.fillStyle='#a4c0c6';ctx.font='bold 14px system-ui';ctx.fillText('RÉGION PARISIENNE',20,46);
+  ctx.fillStyle='#7e9ca6';ctx.font='11px system-ui';ctx.fillText('PLAN LOCAL SCHÉMATIQUE · tracés illustratifs',20,H-18);
+
+  ctx.beginPath();
+  ZONE.forEach((p,i)=>{const x=p[0]*W,y=p[1]*H; i?ctx.lineTo(x,y):ctx.moveTo(x,y);});
+  ctx.closePath();
+  ctx.strokeStyle="#1b3245"; ctx.lineWidth=1.5; ctx.stroke();
+  ctx.fillStyle="rgba(18,40,58,0.18)"; ctx.fill();
+  ctx.beginPath();
+  SEINE.forEach((p,i)=>{const x=p[0]*W,y=p[1]*H; i?ctx.lineTo(x,y):ctx.moveTo(x,y);});
+  ctx.strokeStyle="#1d4a63"; ctx.lineWidth=3; ctx.lineJoin="round"; ctx.stroke();
+  ctx.strokeStyle="#0f1f2d"; ctx.lineWidth=1;
+  for(let i=1;i<6;i++){ const x=W*i/6; ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for(let i=1;i<5;i++){ const y=H*i/5; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+  AEROPORTS_STY.forEach(a=>{
+    const x=a.x*W,y=a.y*H;
+    ctx.fillStyle="#2b4b63"; ctx.fillRect(x-3,y-3,6,6);
+    ctx.fillStyle="#5b86a3"; ctx.font="9px system-ui";
+    ctx.fillText(a.nom, x+7, y+3);
+  });
+}
+
+function drawRadar(W,H){
+  const cx=W*0.5, cy=H*0.5, R=Math.hypot(W,H)*0.55;
+  // sur carte claire le radar doit rester lisible : trait un peu plus dense
+  const clair = mapOK;
+  ctx.strokeStyle = clair ? "rgba(15,110,86,0.18)" : "#13283a";
+  for(let k=1;k<=3;k++){ ctx.beginPath(); ctx.arc(cx,cy,R*k/3.2,0,7); ctx.stroke(); }
+  ctx.save();
+  ctx.translate(cx,cy); ctx.rotate(radarAngle);
+  const g=ctx.createLinearGradient(0,0,R,0);
+  const a0 = clair ? 0.16 : 0.10;
+  g.addColorStop(0,`rgba(15,158,117,${a0})`);
+  g.addColorStop(1,"rgba(15,158,117,0)");
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.arc(0,0,R,-0.32,0); ctx.closePath();
+  ctx.fillStyle=g; ctx.fill();
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(R,0);
+  ctx.strokeStyle = clair ? "rgba(15,158,117,0.45)" : "rgba(70,211,163,0.35)";
+  ctx.lineWidth=1.5; ctx.stroke();
+  ctx.restore();
+}
+
+function draw(){
+  const W=cv.width/devicePixelRatio, H=cv.height/devicePixelRatio;
+  ctx.clearRect(0,0,W,H);
+  if(!mapOK) drawDecorStylise(W,H);   // décor seulement sans vraie carte
+  drawRadar(W,H);
+
+  for(const p of planesCourants()){
+    const [x,y]=proj(p.x,p.y,W,H);
+    const c=couleur(p), suspect=(p.mode!=="normal" && p.mode!=="live") || p.squawk==="7700" || (p.alt>0&&p.alt<=(SOURCE.live?900:2000));
+
+    // traînée
+    if(p.trail.length>1){
+      for(let i=1;i<p.trail.length;i++){
+        const A=proj(p.trail[i-1][0],p.trail[i-1][1],W,H);
+        const B=proj(p.trail[i][0],p.trail[i][1],W,H);
+        ctx.beginPath(); ctx.moveTo(A[0],A[1]); ctx.lineTo(B[0],B[1]);
+        ctx.strokeStyle=c; ctx.globalAlpha=(i/p.trail.length)*(suspect?0.55:0.32);
+        ctx.lineWidth=suspect?2.2:1.5; ctx.stroke();
+      }
+      ctx.globalAlpha=1;
+    }
+
+    // halo suspect (anneau qui respire)
+    if(suspect){
+      const pr=10+Math.sin(Date.now()/200+String(p.id).length)*2;
+      ctx.beginPath(); ctx.arc(x,y,pr+4,0,7); ctx.fillStyle=c+"24"; ctx.fill();
+      ctx.beginPath(); ctx.arc(x,y,pr+4,0,7); ctx.strokeStyle=c+"dd"; ctx.lineWidth=1.4; ctx.stroke();
+    }
+
+    // triangle orienté selon le cap
+    ctx.save(); ctx.translate(x,y); ctx.rotate(p.cap*Math.PI/180);
+    ctx.beginPath(); ctx.moveTo(0,-7); ctx.lineTo(5,6); ctx.lineTo(-5,6); ctx.closePath();
+    ctx.fillStyle=c; ctx.fill();
+    // contour blanc léger pour détacher de la carte claire
+    if(mapOK){ ctx.strokeStyle="rgba(255,255,255,0.7)"; ctx.lineWidth=0.8; ctx.stroke(); }
+    ctx.restore();
+
+    // étiquette callsign (fond pour lisibilité sur carte claire)
+    ctx.font="9px system-ui";
+    const label=p.callsign;
+    if(mapOK){
+      const w=ctx.measureText(label).width;
+      ctx.fillStyle="rgba(5,15,26,0.78)";
+      ctx.fillRect(x+8, y-5, w+4, 11);
+    }
+    ctx.fillStyle = suspect ? c : (mapOK ? "#e5f6ff" : "#6f93b099");
+    ctx.fillText(label, x+10, y+3);
+  }
+
+  radarAngle=(radarAngle+0.012)%(Math.PI*2);
+  requestAnimationFrame(draw);
+}
+
+/* ---------- fond satellite / cartographique, avec repli local ---------- */
+const FONDS = [
+  { nom:"Satellite Esri", url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', sub:'',
+    attr:'Tiles &copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community', satellite:true },
+  { nom:"OpenStreetMap", url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png', sub:'',
+    attr:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>', satellite:false }
+];
+let FOND_IDX=0, FOND_LAYER=null, offlineMap=false, fondVersion=0;
+function updateMapButton(){
+  const b=document.getElementById('mapModeBtn');
+  b.textContent=offlineMap?'Carte en ligne':'Carte locale';
+  b.title=offlineMap?'Réessayer les fonds en ligne':'Utiliser le plan local sans connexion';
+  const layer=document.getElementById('layerBtn');
+  layer.textContent=FOND_IDX===0?'Vue carte':'Vue satellite';
+  layer.disabled=offlineMap;
+}
+function modeLocal(){
+  offlineMap=true; mapOK=false; fondVersion++;
+  if(MAP){try{MAP.remove();}catch(e){} MAP=null;}
+  document.getElementById('map').style.display='none';
+  updateMapButton();
+}
+function essayerFond(){
+  if(!MAP||offlineMap) return;
+  const version=++fondVersion;
+  const f=FONDS[FOND_IDX];
+  let charge=false, erreurs=0;
+  const layer=L.tileLayer(f.url,{attribution:f.attr,subdomains:f.sub,maxZoom:18});
+  layer.on('tileload',()=>{
+    if(version!==fondVersion||offlineMap) return;
+    charge=true;mapOK=true;
+    if(FOND_LAYER&&FOND_LAYER!==layer) MAP.removeLayer(FOND_LAYER);
+    FOND_LAYER=layer;
+  });
+  const fallback=()=>{
+    if(version!==fondVersion||charge||offlineMap) return;
+    if(FOND_IDX===0){FOND_IDX=1;essayerFond();}
+    else modeLocal();
+    updateMapButton();
+  };
+  layer.on('tileerror',()=>{if(++erreurs>=4) fallback();});
+  layer.addTo(MAP);
+  setTimeout(fallback,6500);
+  updateMapButton();
+}
+function initMap(){
+  offlineMap=false;mapOK=false;
+  document.getElementById('map').style.display='block';
+  updateMapButton();
+  if(typeof L==='undefined'){modeLocal();return;}
+  try{
+    MAP=L.map('map',{zoomControl:false,attributionControl:true,
+      dragging:false,scrollWheelZoom:false,doubleClickZoom:false,boxZoom:false,keyboard:false,touchZoom:false});
+    MAP.fitBounds([[GEO.latS,GEO.lonW],[GEO.latN,GEO.lonE]]);
+    essayerFond();
+  }catch(e){modeLocal();}
+}
+document.getElementById('layerBtn').addEventListener('click',()=>{
+  if(offlineMap)return;
+  FOND_IDX=1-FOND_IDX;
+  essayerFond();
+});
+document.getElementById('mapModeBtn').addEventListener('click',()=>{
+  if(offlineMap){initMap();}else{modeLocal();}
+});
+
+/* ---------- boucles ---------- */
+function tick(){
+  if(!running) return;
+  if(!(SOURCE.mode!=="sim" && SOURCE.live)) stepSky();
+  runCycle();
+}
+function clock(){
+  el("clock").textContent=new Date().toLocaleTimeString("fr-FR");
+}
+
+el("toggle").addEventListener("click",()=>{
+  running=!running;
+  el("toggle").textContent=running?"Pause":"Reprendre";
+});
+
+const introBack=el("introBack");
+function ouvrirIntro(){ introBack.classList.remove("hidden"); running=false; el("toggle").textContent="Reprendre"; }
+function fermerIntro(){ introBack.classList.add("hidden"); running=true; el("toggle").textContent="Pause"; if(SOURCE.mode!=="sim") collecteDirecte(); }
+el("introGo").addEventListener("click", fermerIntro);
+el("help").addEventListener("click", ouvrirIntro);
+
+initSky(11);
+initMap();
+resize();
+draw();
+running=false;   // on démarre sur l'intro ; "Lancer la surveillance" lance les cycles
+setInterval(()=>{ if(running && !(SOURCE.mode!=="sim" && SOURCE.live)) stepSky(); }, 120);   // mouvement fluide (simulation seulement)
+setInterval(tick, 2200);                            // un cycle d'équipe régulier
+setInterval(clock, 1000); clock();
+
+/* ====================== rédacteur : choix du moteur ======================
+   Trois modes. Par défaut « gabarit » : aucun modèle de langage, la démo
+   fonctionne partout et hors ligne. Les deux autres branchent un modèle et
+   retombent sur le gabarit en cas d'échec — en le signalant dans le journal,
+   jamais en silence.                                                      */
+const REDAC = {
+  mode: "gabarit",                        // gabarit | local | distant
+  ollamaUrl: "http://localhost:11434",
+  ollamaModele: "llama3.2",
+  apiUrl: "https://api.openai.com/v1/chat/completions",
+  apiModele: "gpt-4o-mini",
+  apiCle: "",
+};
+
+const CONSIGNE =
+  "Tu rediges un bulletin court en francais, deux phrases au maximum, ton factuel et sobre. "
+  + "Tu ne disposes que des FAITS fournis : n'ajoute aucune information, n'invente rien, "
+  + "ne fais aucune supposition, ne donne aucun conseil qui ne figure pas dans les faits.";
+
+function majChips(){
+  const c = el("chip-redac");
+  const lib = REDAC.mode === "gabarit" ? "gabarit"
+            : REDAC.mode === "local"   ? "modèle local"
+                                       : "modèle distant";
+  c.querySelector("b").textContent = lib;
+  c.className = "chip " + (REDAC.mode === "gabarit" ? "off" : "llm");
+}
+
+async function appelerModele(faits){
+  if(REDAC.mode === "local"){
+    const r = await fetch(REDAC.ollamaUrl.replace(/\/+$/,"") + "/api/generate", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ model:REDAC.ollamaModele, stream:false,
+                             prompt: CONSIGNE + "\n\nFAITS :\n" + faits })
+    });
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    const j = await r.json();
+    return (j.response || "").trim();
+  }
+  if(REDAC.mode === "distant"){
+    const r = await fetch(REDAC.apiUrl, {
+      method:"POST",
+      headers:{ "Content-Type":"application/json", "Authorization":"Bearer " + REDAC.apiCle },
+      body: JSON.stringify({ model:REDAC.apiModele, messages:[
+        { role:"system", content: CONSIGNE },
+        { role:"user",   content: "FAITS :\n" + faits } ] })
+    });
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    const j = await r.json();
+    return ((j.choices && j.choices[0] && j.choices[0].message.content) || "").trim();
+  }
+  return null;
+}
+
+/* Le gabarit s'affiche immédiatement ; si un modèle est branché, il remplace
+   le texte quand il répond. Le bulletin existe donc toujours, même si le
+   modèle est lent, absent ou en erreur. */
+let redactionEnCours = false;
+function reformuler(faits, card){
+  if(REDAC.mode === "gabarit" || redactionEnCours || !faits) return;
+  redactionEnCours = true;
+  appelerModele(faits).then(txt => {
+    if(txt){
+      card.textContent = txt;
+      pushFeed("redacteur", `reformulé par <b>${REDAC.mode === "local" ? REDAC.ollamaModele : REDAC.apiModele}</b>`);
+    }
+  }).catch(e => {
+    pushFeed("redacteur", `modèle indisponible — repli gabarit (${e.message})`);
+  }).finally(() => { redactionEnCours = false; });
+}
+
+/* ---------------------------- panneau ---------------------------- */
+const cfgBack = el("cfgBack");
+function majOptions(){
+  ["gabarit","local","distant"].forEach(m => {
+    el("opt-" + m).classList.toggle("on", REDAC.mode === m);
+  });
+  majChips();
+}
+document.querySelectorAll('input[name=redacMode]').forEach(r => {
+  r.addEventListener("change", () => { REDAC.mode = r.value; majOptions(); });
+});
+[["f-ollamaUrl","ollamaUrl"],["f-ollamaModele","ollamaModele"],
+ ["f-apiUrl","apiUrl"],["f-apiModele","apiModele"],["f-apiCle","apiCle"]].forEach(([id,cle]) => {
+  el(id).addEventListener("input", e => { REDAC[cle] = e.target.value; });
+});
+el("cfgBtn").addEventListener("click", () => { cfgBack.classList.remove("hidden"); });
+el("cfgClose").addEventListener("click", () => { cfgBack.classList.add("hidden"); });
+
+el("cfgTest").addEventListener("click", async () => {
+  const d = el("cfgDiag"); d.classList.add("on");
+  if(REDAC.mode === "gabarit"){
+    d.innerHTML = "Mode gabarit : aucun modèle n'est appelé, il n'y a rien à tester.";
+    return;
+  }
+  d.innerHTML = "Test en cours…";
+  try{
+    const t = await appelerModele("Aucun fait notable.");
+    d.innerHTML = "Connexion établie. Réponse reçue :\n" + (t || "(réponse vide)").slice(0,240);
+  }catch(e){
+    if(REDAC.mode === "local"){
+      d.innerHTML =
+        "Échec : " + e.message + "\n\n"
+      + "Cause la plus fréquente : Ollama n'autorise pas l'origine de cette page. Il n'accepte "
+      + "par défaut que les appels venant de la machine elle-même, et une page ouverte par "
+      + "double-clic n'a pas d'origine reconnue.\n\n"
+      + "Autoriser, puis relancer le service :\n"
+      + "  Linux, macOS en ligne de commande\n    <code>OLLAMA_ORIGINS=\"*\" ollama serve</code>\n"
+      + "  macOS, application\n    <code>launchctl setenv OLLAMA_ORIGINS \"*\"</code> puis redémarrer Ollama\n"
+      + "  Windows\n    <code>setx OLLAMA_ORIGINS \"*\"</code> puis redémarrer Ollama\n\n"
+      + "Vérifier aussi que le modèle est présent : <code>ollama pull " + REDAC.ollamaModele + "</code>\n\n"
+      + "Sur Mac, si cette page est servie en HTTPS, Safari refuse l'appel vers un service local : "
+      + "utiliser Chrome ou Firefox, ou ouvrir la page depuis le disque.";
+    }else{
+      d.innerHTML =
+        "Échec : " + e.message + "\n\n"
+      + "Vérifier l'URL, la clé et le nom du modèle. Certaines API refusent les appels directs "
+      + "depuis un navigateur : dans ce cas un relais côté serveur est nécessaire.";
+    }
+  }
+});
+majOptions();
+
+</script>
+</body>
+</html>
