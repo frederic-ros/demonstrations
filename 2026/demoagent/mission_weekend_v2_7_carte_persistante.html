@@ -1,0 +1,291 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mission Week-end V2.7 · Laboratoire d'orchestration</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{color-scheme:dark;--bg:#07111e;--panel:#101f30;--line:#294056;--text:#eaf3fc;--muted:#a1b5c9;--cyan:#57d7ed;--green:#6ee5ac;--amber:#ffcb76}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+header{padding:19px 25px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px;background:#0d1b2b}
+h1{font-size:24px;margin:0;letter-spacing:-.6px}h2{font-size:15px;margin:0 0 12px}small,.muted{color:var(--muted)}.eyebrow{color:var(--cyan);font-size:11px;letter-spacing:2px;font-weight:700}
+.shell{display:grid;grid-template-columns:305px minmax(360px,1fr) 355px;gap:14px;padding:14px;max-width:1900px;margin:auto;align-items:start}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;min-width:0}
+label{display:block;color:#c5d6e8;font-size:12px;margin:12px 0 5px}input,select,button{font:inherit}input,select{width:100%;border:1px solid #36516c;background:#081726;color:white;border-radius:8px;padding:9px}
+button{border:0;border-radius:9px;padding:11px 13px;cursor:pointer;font-weight:700}button:disabled{opacity:.5;cursor:wait}.primary{background:var(--cyan);color:#05202a;width:100%;margin-top:16px}.secondary{background:#21394e;color:white;border:1px solid #42607c}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:9px}.help{font-size:11px;color:var(--muted);margin-top:8px}.mapwrap{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--line)}#map{height:390px;background:#112339}
+.maplabel{position:absolute;top:12px;left:12px;z-index:600;background:#081a2cdd;padding:8px 11px;border:1px solid #44617d;border-radius:8px;font-size:12px}
+#status{padding:11px 13px;background:#09283a;border-left:3px solid var(--cyan);border-radius:7px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.stat{background:#0a1828;border-radius:9px;padding:10px}.stat strong{display:block;font-size:22px;color:var(--cyan)}.stat span{font-size:11px;color:var(--muted)}
+.flow{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin:13px 0}.node{background:#0a1c2d;border:1px solid #37546d;border-radius:8px;padding:8px 10px;font-size:12px}.node.active{border-color:var(--cyan);box-shadow:0 0 0 2px #57d7ed24}.arrow{color:var(--cyan)}
+#log{height:390px;overflow:auto;display:flex;flex-direction:column;gap:9px}.entry{border-left:3px solid #58758c;background:#0a1b2b;padding:10px;border-radius:6px}.entry.good{border-color:var(--green)}.entry.warn{border-color:var(--amber)}.entry b{display:block;font-size:12px}.entry small{display:block;margin-top:3px;line-height:1.5}
+.card{border:1px solid #38516a;background:#0a1a2b;border-radius:10px;padding:12px;margin:9px 0}.card strong{font-size:16px}.pill{display:inline-block;font-size:10px;padding:3px 7px;border-radius:20px;background:#1c4653;color:#b5f5fc;margin-left:6px}.tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}.tag{font-size:11px;background:#20374b;padding:4px 7px;border-radius:5px}
+.near{border-left:3px solid var(--amber)}.nearhead{display:flex;justify-content:space-between;gap:8px;align-items:center}.reason{color:#f6d39b;font-size:12px;margin:5px 0}.suggest{background:#102a38;border:1px solid #42677a;border-radius:10px;padding:13px;margin-top:12px}.suggest button{margin-top:9px}.subtle{font-size:12px;color:var(--muted)}footer{padding:14px 25px;color:var(--muted);font-size:11px;border-top:1px solid var(--line)}.error{color:#ffb4a8}
+@media(max-width:1150px){.shell{grid-template-columns:290px 1fr}.right{grid-column:1/-1}#log{height:250px}}@media(max-width:740px){.shell{display:block}.panel{margin-bottom:12px}#map{height:330px}}
+
+.choicebar{max-width:1900px;margin:14px auto 0;padding:0 14px}.choicehead{font-size:19px;margin:0 0 9px}.choices{display:grid;grid-template-columns:1fr 1fr;gap:12px}.choice{background:#10283c;border:2px solid #35536b;border-radius:14px;padding:16px;text-align:left;color:var(--text);width:100%;display:block}.choice:hover{border-color:var(--cyan)}.choice.selected{border-color:var(--cyan);background:#123548;box-shadow:0 0 0 2px #57d7ed18}.choice strong{display:block;font-size:17px;margin:4px 0}.choice span{display:block;color:var(--muted);font-size:12px;font-weight:400}.choice .symbol{font-size:23px}.choicehint{margin:10px 0 0;color:var(--muted);font-size:12px}.hidden{display:none!important}
+@media(max-width:740px){.choices{grid-template-columns:1fr}.choicebar{margin-top:10px}}
+</style></head><body>
+<header><div><div class="eyebrow">LABORATOIRE PÉDAGOGIQUE · SYSTÈMES AGENTIQUES</div><h1>Mission Week-end <span style="color:var(--cyan)">↻</span></h1><small>Paris → France · Comparer un workflow fixe et un orchestrateur à boucle de décision</small></div><div id="health" class="muted">● API non vérifiée</div></header>
+<section class="choicebar"><h2 class="choicehead">Que souhaitez-vous faire ?</h2><div class="choices"><button type="button" id="chooseMission" class="choice selected" aria-pressed="true"><span class="symbol">🧭</span><strong>Organiser mon week-end</strong><span>Explorer des destinations selon mes contraintes. Comparer workflow fixe et orchestrateur adaptatif.</span></button><button type="button" id="chooseAdvice" class="choice" aria-pressed="false"><span class="symbol">💡</span><strong>Trouver les meilleurs compromis</strong><span>Faire intervenir un agent-conseil : quels critères assouplir pour rendre un week-end envisageable ?</span></button></div><p class="choicehint" id="choiceHint">Parcours sélectionné : mission principale. Les critères restent modifiables dans le panneau de gauche.</p></section>
+<main class="shell">
+<section class="panel"><h2>01 · Définir la mission</h2>
+<div id="workflowSettings"><label>Mode de fonctionnement</label><select id="mode"><option value="agent">Agent orchestré — décisions adaptatives</option><option value="workflow">Workflow — liste fixe</option></select></div>
+<label>Ville de départ</label><input value="Paris (fixe pour la démonstration)" disabled>
+<label>Date du week-end (jour de départ)</label><input id="date" type="date">
+<div class="two"><div><label>Température min. (°C)</label><input id="temp" type="number" min="0" max="35" value="19"></div><div><label>Pluie max. (%)</label><input id="rain" type="number" min="0" max="100" value="40"></div></div>
+<div class="two"><div><label>Trajet max. (h)</label><input id="travel" type="number" min="1" max="15" step=".5" value="5"></div><div><label>Budget A/R (€)</label><input id="budget" type="number" min="30" max="1500" value="250"></div></div>
+<div class="two"><div><label>Vent max. (km/h)</label><input id="wind" type="number" min="5" max="120" value="45"></div><div><label>Décisions max.</label><input id="limit" type="number" min="0" max="10" value="10"></div></div>
+<label>Voyageurs</label><input id="people" type="number" min="1" max="5" value="2">
+<button class="primary" id="start">▶ Lancer la mission</button>
+<p class="help">Le nombre de décisions limite uniquement la mission principale. À 0 décision, elle s’arrête sans exploration. Pour rechercher des compromis, choisissez directement « Trouver les meilleurs compromis » en haut de page. Les seuils sont stricts. L'orchestrateur change de destination ou de transport, mais ne modifie jamais vos contraintes sans autorisation.</p>
+<div class="card"><b>Provenance des données</b><div class="tags"><span class="tag">☀ Open-Meteo : réel</span><span class="tag">🚗 IGN : réel si disponible</span><span class="tag">🚆 Train : estimé</span><span class="tag">✈ Avion : estimé</span><span class="tag">€ Budget : hypothèse</span></div><p class="help">Aucun tarif ou horaire commercial en temps réel. Les modes estimés sont identifiés dans chaque résultat.</p></div>
+</section>
+<section class="panel"><h2>02 · Explorer la France</h2><div class="mapwrap"><div class="maplabel">🛰 Carte satellite · <span id="mapHint">10 destinations françaises</span></div><div id="map"></div></div>
+<div class="stats"><div class="stat"><strong id="nDec">0</strong><span>Décisions</span></div><div class="stat"><strong id="nCity">0</strong><span>Villes évaluées</span></div><div class="stat"><strong id="nGood">0</strong><span>Solutions valides</span></div></div>
+<h2 style="margin-top:18px">Orchestration visible</h2><div class="flow"><span class="node" id="plan">🧠 Planifier</span><span class="arrow">→</span><span class="node" id="weather">☀ Météo</span><span class="arrow">→</span><span class="node" id="mobility">🚗 Mobilité</span><span class="arrow">→</span><span class="node" id="evaluate">⚖ Évaluer</span><span class="arrow">↺</span></div>
+<p class="muted" id="status">Prêt à lancer une mission.</p><h2>03 · Recommandations</h2><div id="results" class="muted">Lancez une mission pour découvrir les destinations compatibles.</div>
+</section>
+<section class="panel right"><h2>Journal des décisions · temps réel</h2><p class="muted">Chaque observation entraîne une décision explicite. Le mode workflow ne réoriente pas sa recherche.</p><div id="log"><div class="entry"><b>En attente</b><small>Choisissez vos contraintes et lancez la mission.</small></div></div></section>
+</main><footer>Mission Week-end v2.7 · Démonstrateur pédagogique. « Agent » = politique d'orchestration explicite en JavaScript, sans LLM. La boucle de décision est réelle ; les heuristiques de choix sont déterministes. Distances/durées IGN : trajet automobile calculé, non trafic temps réel. Budgets et alternatives ferroviaires/aériennes : estimations non commerciales.</footer>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+'use strict';
+const API='https://missionweek-end.frederic-ros.workers.dev';
+const DEST=[
+{name:'Lille',lat:50.6292,lon:3.0573,rail:1.2,air:null,km:225},
+{name:'Strasbourg',lat:48.5734,lon:7.7521,rail:1.9,air:null,km:490},
+{name:'Rennes',lat:48.1173,lon:-1.6778,rail:1.6,air:null,km:350},
+{name:'Nantes',lat:47.2184,lon:-1.5536,rail:2.1,air:null,km:385},
+{name:'Bordeaux',lat:44.8378,lon:-.5792,rail:2.3,air:4.0,km:590},
+{name:'Lyon',lat:45.764,lon:4.8357,rail:2.0,air:null,km:465},
+{name:'Dijon',lat:47.322,lon:5.0415,rail:1.7,air:null,km:315},
+{name:'Marseille',lat:43.2965,lon:5.3698,rail:3.4,air:4.1,km:775},
+{name:'Montpellier',lat:43.6108,lon:3.8767,rail:3.5,air:4.2,km:745},
+{name:'Nice',lat:43.7102,lon:7.262,rail:5.8,air:4.3,km:930}
+];
+const $=id=>document.getElementById(id);let busy=false,marks=[],adviceMarks=[],records=[],cache=new Map();
+const map=window.L?L.map('map',{zoomControl:true}).setView([46.65,2.6],6):null;
+if(map){L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'Tiles © Esri',maxZoom:18}).addTo(map);L.circleMarker([48.8566,2.3522],{radius:9,color:'#57d7ed',fillColor:'#57d7ed',fillOpacity:.8}).addTo(map).bindPopup('Départ : Paris');}
+const dateISO=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
+const today=new Date(),dateStart=new Date(today);dateStart.setDate(today.getDate()+2);
+$('date').min=dateISO(today);$('date').max=dateISO(new Date(today.getFullYear(),today.getMonth(),today.getDate()+13));$('date').value=dateISO(dateStart);
+function log(title,msg,kind=''){const e=document.createElement('div');e.className='entry '+kind;const b=document.createElement('b'),s=document.createElement('small');b.textContent=title;s.textContent=msg;e.append(b,s);$('log').append(e);$('log').scrollTop=$('log').scrollHeight;}
+function stage(id){['plan','weather','mobility','evaluate'].forEach(x=>$(x).classList.toggle('active',x===id))}
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+function mark(d,ok,n){if(!map)return;const color=ok?'#6ee5ac':'#ffcb76';const m=L.circleMarker([d.lat,d.lon],{radius:8,color,weight:2,fillColor:color,fillOpacity:.65}).addTo(map).bindPopup(`${n}. ${d.name} — ${ok?'admissible':'écartée'}`);marks.push(m)}
+function markAdvice(c,n){
+ if(!map)return;
+ // Vert = destination admissible après application des ajustements proposés,
+ // et non nécessairement admissible avec les critères actuels.
+ const green='#48e89b';
+ const marker=L.circleMarker([c.d.lat,c.d.lon],{
+  radius:11,color:'#0d6d46',weight:3,fillColor:green,fillOpacity:.95
+ }).addTo(map);
+ const note=c.gaps.length
+  ? 'Admissible SI les compromis proposés sont acceptés : '+c.gaps.map(g=>g.exact).join(' ; ')
+  : 'Déjà admissible sans modifier les critères';
+ marker.bindPopup(`<strong>${n}. ${c.d.name} · ${c.x.mode}</strong><br>${note}<br><small>Vert = scénario réalisable sous conditions, pas réservation confirmée.</small>`);
+ marker.bindTooltip(`${c.d.name} · ${c.gaps.length?'avec compromis':'déjà conforme'}`,{direction:'top'});
+ adviceMarks.push(marker);
+}
+async function getJSON(path){const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),14000);try{const r=await fetch(API+path,{signal:ctrl.signal});const j=await r.json();if(!r.ok)throw Error([j.error,j.detail].filter(Boolean).join(' — ')||'HTTP '+r.status);return j}finally{clearTimeout(timer)}}
+async function meteo(d,date){const key='meteo:'+d.name;if(!cache.has(key))cache.set(key,getJSON('/api/meteo?city='+encodeURIComponent(d.name)).catch(e=>{cache.delete(key);throw e}));const j=await cache.get(key);const i=j.daily?.time?.indexOf(date)??-1;if(i<0)throw Error('Date hors prévisions');const v=k=>Number(j.daily[k]?.[i]);const m={temp:v('temperature_2m_max'),rain:v('precipitation_probability_max'),wind:v('wind_speed_10m_max'),sun:Math.round(v('sunshine_duration')/3600*10)/10};if(Object.values(m).some(x=>!Number.isFinite(x)))throw Error('Prévision incomplète');return m}
+async function road(d){const key='route:'+d.name;if(!cache.has(key))cache.set(key,getJSON('/api/route?city='+encodeURIComponent(d.name)).catch(e=>{cache.delete(key);throw e}));try{return await cache.get(key)}catch{return null}}
+function modes(d,roadData,people){
+ const km=roadData?.distance_km??d.km,drive=roadData?.duration_h??null;
+ // Approximation pédagogique : 0,11 €/km carburant + 0,045 €/km péages, A/R, pour le véhicule entier.
+ const out=[{mode:'Voiture',hours:drive,cost:Math.round(2*km*(.11+.045)),source:roadData?'IGN (durée/distance) + coût estimé':'IGN indisponible',estimated:!roadData}];
+ // Heuristiques non commerciales : billets A/R par personne, calculés depuis la distance indicative.
+ out.push({mode:'Train',hours:d.rail,cost:Math.round((30+0.115*d.km)*2*people),source:'Durée et tarif indicatifs (non SNCF)',estimated:true});
+ if(d.air!==null)out.push({mode:'Avion',hours:d.air,cost:Math.round((70+0.095*d.km)*2*people),source:'Porte-à-porte et tarif indicatifs (non compagnie)',estimated:true});
+ return out.filter(x=>x.hours!==null);
+}
+function score(d,m,t){return Math.round(100+(m.temp-t.temp)*3+(t.rain-m.rain)*.2+(t.wind-m.wind)*.2+m.sun*2-(d.hours*5)-(d.cost/25))}
+function reasons(r,t){
+ const issues=[];
+ if(!r.m)return ['Données météo indisponibles : impossible de conclure'];
+ if(r.m.temp<t.temp)issues.push(`Température : ${r.m.temp} °C, soit ${(t.temp-r.m.temp).toFixed(1)} °C sous le minimum de ${t.temp} °C`);
+ if(r.m.rain>t.rain)issues.push(`Pluie : ${r.m.rain} %, soit ${(r.m.rain-t.rain).toFixed(0)} points au-dessus de ${t.rain} %`);
+ if(r.m.wind>t.wind)issues.push(`Vent : ${r.m.wind} km/h, soit ${(r.m.wind-t.wind).toFixed(1)} km/h au-dessus de ${t.wind} km/h`);
+ if(r.options?.length && !r.options.some(x=>x.pass)){
+   const closest=[...r.options].sort((a,b)=>Math.max(0,a.hours-t.travel)/Math.max(1,t.travel)+Math.max(0,a.cost-t.budget)/Math.max(1,t.budget)-Math.max(0,b.hours-t.travel)/Math.max(1,t.travel)-Math.max(0,b.cost-t.budget)/Math.max(1,t.budget))[0];
+   if(closest.hours>t.travel)issues.push(`Trajet ${closest.mode} : ${closest.hours} h pour ${t.travel} h maximum`);
+   if(closest.cost>t.budget)issues.push(`Budget ${closest.mode} : ${closest.cost} € pour ${t.budget} € maximum (tarif estimé)`);
+ }
+ return issues.length?issues:['Aucun écart identifié'];
+}
+function deviation(r,t){
+ if(!r.m)return Infinity;
+ let z=Math.max(0,t.temp-r.m.temp)/Math.max(3,t.temp)+Math.max(0,r.m.rain-t.rain)/100+Math.max(0,r.m.wind-t.wind)/Math.max(20,t.wind);
+ if(r.options?.length){const transport=Math.min(...r.options.map(x=>Math.max(0,x.hours-t.travel)/Math.max(1,t.travel)+Math.max(0,x.cost-t.budget)/Math.max(1,t.budget)));z+=transport;}
+ else z+=.08; // transport non vérifié : classement provisoire, pas de conformité présumée
+ return z;
+}
+function render(){
+ const t=readCriteria(),target=$('results');target.replaceChildren();
+ const valid=records.filter(r=>r.valid).sort((a,b)=>b.score-a.score);
+ if(valid.length){
+   valid.slice(0,4).forEach((r,i)=>{const e=document.createElement('div');e.className='card';const h=document.createElement('strong');h.textContent=(i===0?'★ ':'')+r.name;const p=document.createElement('p');p.style.margin='6px 0';p.textContent=`☀ ${r.m.temp} °C · pluie ${r.m.rain} % · vent ${r.m.wind} km/h · soleil ${r.m.sun} h`;const tags=document.createElement('div');tags.className='tags';for(const x of r.options.filter(x=>x.pass)){const tag=document.createElement('span');tag.className='tag';tag.textContent=`${x.mode} · ${x.hours} h · ${x.cost} € A/R ${x.estimated?'(estimé)':'(durée IGN)'}`;tags.append(tag)}e.append(h,p,tags);target.append(e)});
+   return;
+ }
+ const intro=document.createElement('p');intro.className='muted';intro.textContent=records.length?'Aucune solution conforme parmi les destinations effectivement examinées. Voici les refus les plus proches de vos critères.':'Aucune destination évaluée pour cette mission.';target.append(intro);
+ const rejected=records.filter(r=>!r.valid&&r.m).sort((a,b)=>deviation(a,t)-deviation(b,t)).slice(0,3);
+ rejected.forEach((r,i)=>{
+   const e=document.createElement('div');e.className='card near';const head=document.createElement('div');head.className='nearhead';const h=document.createElement('strong');h.textContent=`${i+1}. ${r.name}`;const state=document.createElement('span');state.className='pill';state.textContent='Non conforme';head.append(h,state);e.append(head);
+   const sub=document.createElement('div');sub.className='subtle';sub.textContent=`${r.m.temp} °C · pluie ${r.m.rain} % · vent ${r.m.wind} km/h · ${r.options?.length?'mobilité évaluée':'mobilité non évaluée (filtre météo)'}`;e.append(sub);
+   for(const reason of reasons(r,t)){const line=document.createElement('div');line.className='reason';line.textContent='• '+reason;e.append(line)}
+   target.append(e);
+ });
+ if(!rejected.length)return;
+ const first=rejected[0],suggest=document.createElement('div');suggest.className='suggest';const heading=document.createElement('b');heading.textContent='💡 Piste de révision (sur les villes examinées)';suggest.append(heading);
+ let field=null,newValue=null,message='';
+ const weatherIssues=[];
+ if(first.m.temp<t.temp)weatherIssues.push({field:'temp',value:Math.floor(first.m.temp*10)/10,diff:(t.temp-first.m.temp)/Math.max(3,t.temp),msg:`Abaisser la température minimale de ${t.temp} à ${Math.floor(first.m.temp*10)/10} °C`});
+ if(first.m.rain>t.rain)weatherIssues.push({field:'rain',value:Math.ceil(first.m.rain),diff:(first.m.rain-t.rain)/100,msg:`Relever la pluie maximale de ${t.rain} à ${Math.ceil(first.m.rain)} %`});
+ if(first.m.wind>t.wind)weatherIssues.push({field:'wind',value:Math.ceil(first.m.wind),diff:(first.m.wind-t.wind)/Math.max(20,t.wind),msg:`Relever le vent maximal de ${t.wind} à ${Math.ceil(first.m.wind)} km/h`});
+ if(weatherIssues.length){weatherIssues.sort((a,b)=>a.diff-b.diff);({field,newValue,message}= {field:weatherIssues[0].field,newValue:weatherIssues[0].value,message:weatherIssues[0].msg});}
+ else if(first.options?.length){const x=[...first.options].sort((a,b)=>deviation({...first,options:[a]},t)-deviation({...first,options:[b]},t))[0];if(x.hours>t.travel){field='travel';newValue=Math.ceil(x.hours*2)/2;message=`Porter le trajet maximal de ${t.travel} à ${newValue} h`;}else if(x.cost>t.budget){field='budget';newValue=Math.ceil(x.cost);message=`Porter le budget de ${t.budget} à ${newValue} € (estimation)`;}}
+ const p=document.createElement('p');p.className='subtle';p.textContent=message?`${message} pourrait réduire un refus, sans garantir la conformité : d'autres contraintes peuvent rester bloquantes.`:'Les refus observés ne permettent pas de proposer un assouplissement unique fiable.';suggest.append(p);
+ if(field!==null&&newValue!==null){const btn=document.createElement('button');btn.className='secondary';btn.textContent='Appliquer ce seul changement et relancer';btn.addEventListener('click',()=>{if(busy)return;$(field).value=String(newValue);run()});suggest.append(btn)}
+ target.append(suggest);
+ const foot=document.createElement('p');foot.className='help';foot.textContent=`${records.length} destination(s) examinée(s) sur ${DEST.length}. Les destinations non examinées ne sont pas classées. Le classement est indicatif et les coûts de transport restent estimés.`;target.append(foot);
+}
+
+// Agent-conseil indépendant : 0 décision de l'orchestrateur principal,
+// mais jusqu'à 10 consultations météo et 3 consultations IGN, explicitement affichées.
+function adviceGaps(m,x,t){
+ const gaps=[];
+ if(m.temp<t.temp)gaps.push({field:'temp',value:Math.floor(m.temp*10)/10,weight:(t.temp-m.temp)/Math.max(3,t.temp),label:`Accepter ${m.temp} °C au lieu de ${t.temp} °C minimum`,exact:`température minimale ${t.temp} → ${m.temp} °C`});
+ if(m.rain>t.rain)gaps.push({field:'rain',value:Math.ceil(m.rain),weight:(m.rain-t.rain)/100,label:`Tolérer ${m.rain} % de pluie au lieu de ${t.rain} %`,exact:`pluie maximale ${t.rain} → ${m.rain} %`});
+ if(m.wind>t.wind)gaps.push({field:'wind',value:Math.ceil(m.wind),weight:(m.wind-t.wind)/Math.max(20,t.wind),label:`Tolérer ${m.wind} km/h de vent au lieu de ${t.wind}`,exact:`vent maximal ${t.wind} → ${m.wind} km/h`});
+ if(x.hours>t.travel)gaps.push({field:'travel',value:Math.ceil(x.hours*10)/10,weight:(x.hours-t.travel)/Math.max(1,t.travel),label:`Accepter ${x.hours} h de trajet au lieu de ${t.travel} h`,exact:`trajet maximal ${t.travel} → ${x.hours} h`});
+ if(x.cost>t.budget)gaps.push({field:'budget',value:Math.ceil(x.cost),weight:(x.cost-t.budget)/Math.max(1,t.budget),label:`Porter le budget de ${t.budget} à ${Math.ceil(x.cost)} € A/R`,exact:`budget A/R ${t.budget} → ${Math.ceil(x.cost)} €`});
+ return gaps;
+}
+async function advisoryZero(t,date){
+ $('status').textContent='Agent-conseil : recherche des compromis (0 décision de la mission principale)…';
+ $('results').replaceChildren();
+ log('AGENT-CONSEIL · DÉMARRAGE','Diagnostic séparé de la mission principale : consultation météo de 10 villes, puis mobilité des 3 candidates les plus prometteuses. Ces consultations ne sont pas des décisions de mission.');
+ const weather=[];
+ for(const d of DEST){
+   try {const m=await meteo(d,date);weather.push({d,m});}
+   catch(e){log('DONNÉE NON DISPONIBLE',`${d.name} : ${e.message}`,'warn');}
+ }
+ if(!weather.length){
+   $('status').textContent='Diagnostic impossible : aucune prévision exploitable.';
+   $('results').textContent='Aucune prévision disponible à cette date. Choisissez une date comprise dans la période couverte par Open-Meteo.';
+   return;
+ }
+ const weatherDistance=m=>Math.max(0,t.temp-m.temp)/Math.max(3,t.temp)+Math.max(0,m.rain-t.rain)/100+Math.max(0,m.wind-t.wind)/Math.max(20,t.wind);
+ weather.sort((a,b)=>weatherDistance(a.m)-weatherDistance(b.m));
+ const shortlisted=weather.slice(0,3);
+ log('AGENT-CONSEIL · PRÉSÉLECTION',`${weather.length} météo(s) consultée(s) ; 3 candidates retenues pour vérifier les compromis de mobilité : ${shortlisted.map(x=>x.d.name).join(', ')}.`);
+ const candidates=[];
+ for(const {d,m} of shortlisted){
+   const rd=await road(d);
+   const opts=modes(d,rd,t.people);
+   if(!rd)log('IGN NON DISPONIBLE',`${d.name} : comparaison limitée aux transports estimés, sans durée voiture inventée.`,'warn');
+   for(const x of opts){
+     const gaps=adviceGaps(m,x,t);
+     candidates.push({d,m,x,gaps,weight:gaps.reduce((a,g)=>a+g.weight,0)});
+   }
+ }
+ candidates.sort((a,b)=>a.weight-b.weight||a.gaps.length-b.gaps.length);
+ const target=$('results');
+ const intro=document.createElement('div');intro.className='suggest';
+ const title=document.createElement('b');title.textContent='🧭 Agent-conseil · Les compromis pour rendre le week-end possible';
+ const description=document.createElement('p');description.className='subtle';
+ description.textContent=`0 décision de la mission principale. Analyse exploratoire séparée : ${weather.length} prévisions météo et ${shortlisted.length} villes étudiées pour la mobilité. Les résultats sont des scénarios conditionnels, pas des offres réservables.`;
+ intro.append(title,description);
+ const legend=document.createElement('p');legend.className='help';
+ legend.textContent='🟢 Sur la carte : destinations possibles après acceptation des ajustements indiqués (ou déjà conformes). Le vert ne signifie pas que les critères ont été modifiés.';
+ intro.append(legend);target.append(intro);
+ const bestByCity=[];const cities=new Set();
+ for(const c of candidates){if(!cities.has(c.d.name)){cities.add(c.d.name);bestByCity.push(c)}if(bestByCity.length===3)break;}
+ for(let i=0;i<bestByCity.length;i++){
+   const c=bestByCity[i],e=document.createElement('div');e.className='card near';
+   const head=document.createElement('strong');head.textContent=`${i+1}. ${c.d.name} · ${c.x.mode}`;
+   const desc=document.createElement('p');desc.className='subtle';
+   desc.textContent=`Météo Open-Meteo : ${c.m.temp} °C, pluie ${c.m.rain} %, vent ${c.m.wind} km/h. ${c.x.mode} : ${c.x.hours} h, ${c.x.cost} € A/R ${c.x.mode==='Voiture'?'(durée IGN, coût estimé)':'(durée et coût estimés)'}.`;
+   e.append(head,desc);
+   if(!c.gaps.length){
+     const ok=document.createElement('p');ok.textContent='✓ Cette option respecte déjà tous vos critères : vous pouvez lancer une mission avec au moins 1 décision pour l’examiner.';e.append(ok);
+   } else {
+     const lead=document.createElement('p');lead.className='reason';lead.textContent=`Pour rendre cette option admissible, ${c.gaps.length} ajustement(s) seraient nécessaires :`;e.append(lead);
+     for(const g of c.gaps){const line=document.createElement('div');line.className='reason';line.textContent='• '+g.label;e.append(line);}
+     const btn=document.createElement('button');btn.className='secondary';btn.style.marginTop='10px';
+     btn.textContent=`Appliquer ces ${c.gaps.length} ajustement(s) et lancer 1 décision`;
+     btn.addEventListener('click',()=>{if(busy)return;for(const g of c.gaps)$(g.field).value=String(g.value);$('limit').value='1';chooseJourney('mission',true);run();});
+     e.append(btn);
+   }
+   target.append(e);markAdvice(c,i+1);
+ }
+ const caveat=document.createElement('p');caveat.className='help';
+ caveat.textContent='Classement heuristique sur 3 villes présélectionnées selon la météo, pas optimisation globale des 10 destinations. Les prix et trajets train/avion sont illustratifs ; le budget voiture est estimé. Appliquer les ajustements modifie les critères uniquement après votre clic.';
+ target.append(caveat);
+ if(map&&adviceMarks.length){map.fitBounds(L.featureGroup(adviceMarks).getBounds().pad(.35),{maxZoom:7,animate:true});}
+ $('status').textContent=`Agent-conseil terminé : ${weather.length} météo(s), ${shortlisted.length} destination(s) comparées, aucune décision principale.`;
+ log('AGENT-CONSEIL · SYNTHÈSE',`Compromis proposés pour ${bestByCity.map(x=>x.d.name).join(', ')}. Aucune contrainte n'a été modifiée automatiquement.`,'good');
+}
+
+function readCriteria(){return {temp:Number($('temp').value),rain:Number($('rain').value),wind:Number($('wind').value),travel:Number($('travel').value),budget:Number($('budget').value),people:Number($('people').value)}}
+function priority(d,t,seen){const south=(50.7-d.lat)*3;const travel=d.rail<=t.travel?8:0;return south+travel+(seen.has(d.name)?-100:0)}
+let selectedJourney="mission";
+function chooseJourney(which,preserveAdvice=false){
+ if(busy)return;selectedJourney=which;const advice=which==="advice";
+ $("chooseMission").classList.toggle("selected",!advice);$("chooseAdvice").classList.toggle("selected",advice);
+ $("chooseMission").setAttribute("aria-pressed",String(!advice));$("chooseAdvice").setAttribute("aria-pressed",String(advice));
+ $("workflowSettings").classList.toggle("hidden",advice);
+ $("limit").closest("div.two").querySelector("div:last-child").classList.toggle("hidden",advice);
+ $("start").textContent=advice?"💡 Rechercher les meilleurs compromis":"▶ Lancer la mission";
+ $("choiceHint").textContent=advice?"Parcours agent-conseil : exploration séparée, sans décision de la mission principale. Les appels météo et mobilité sont affichés.":"Parcours mission : workflow fixe ou orchestrateur adaptatif ; le nombre de décisions limite la recherche.";
+ records=[];marks.forEach(m=>map?.removeLayer(m));marks=[];if(!preserveAdvice){adviceMarks.forEach(m=>map?.removeLayer(m));adviceMarks=[];}["nDec","nCity","nGood"].forEach(id=>$(id).textContent="0");
+ $("results").textContent=advice?"L’agent-conseil proposera les assouplissements nécessaires, après analyse des données disponibles.":"Lancez la mission pour découvrir les destinations compatibles.";
+ $("status").textContent=advice?"Agent-conseil prêt à analyser vos contraintes.":"Mission principale prête.";$("log").replaceChildren();stage("");
+}
+$("chooseMission").addEventListener("click",()=>chooseJourney("mission"));
+$("chooseAdvice").addEventListener("click",()=>chooseJourney("advice"));
+async function run(){
+ if(busy)return;const t=readCriteria(),limit=Number($('limit').value),date=$('date').value,agent=$('mode').value==='agent';
+ if(!date||Object.values(t).some(x=>!Number.isFinite(x)||x<=0)||!Number.isInteger(limit)||limit<0||limit>10){alert('Vérifie les critères et la date.');return}
+ busy=true;$('start').disabled=true;records=[];['nDec','nCity','nGood'].forEach(id=>$(id).textContent='0');$('status').textContent='Mission en cours…';marks.forEach(m=>map?.removeLayer(m));marks=[];$('log').replaceChildren();$('log').scrollTop=0;$('results').textContent=selectedJourney==='advice'?'Agent-conseil : recherche des compromis…':'Recherche en cours…';
+ let decisions=0,seen=new Set(),best=null;const order=agent?[...DEST].sort((a,b)=>priority(b,t,seen)-priority(a,t,seen)):[...DEST];
+ if(selectedJourney==='advice'){adviceMarks.forEach(m=>map?.removeLayer(m));adviceMarks=[];try{await advisoryZero(t,date)}catch(e){log('AGENT-CONSEIL · ERREUR',e.message,'warn');$('status').textContent='Diagnostic interrompu : '+e.message}finally{busy=false;$('start').disabled=false;stage('')}return;}
+ if(limit===0){$('status').textContent='Mission arrêtée : limite de 0 décision. Aucune destination évaluée.';$('results').textContent='Aucune destination évaluée. Augmentez le nombre de décisions ou choisissez « Trouver les meilleurs compromis » en haut de page.';log('ARRÊT','0 décision autorisée : aucun appel météo ni mobilité pour la mission principale.');busy=false;$('start').disabled=false;return;}
+ log('ORCHESTRATEUR · initialisation',agent?'Politique adaptative : je privilégie le soleil et les trajets plausibles. Je réévaluerai les priorités après chaque résultat.':'Workflow fixe : je parcours les destinations dans un ordre immuable, sans réorientation.');
+ try{
+  while(decisions<limit&&seen.size<DEST.length){
+   stage('plan');const d=order.find(x=>!seen.has(x.name));if(!d)break;seen.add(d.name);decisions++;$('nDec').textContent=decisions;$('nCity').textContent=seen.size;
+   log(`Décision ${decisions} · PLANIFIER`,`Destination choisie : ${d.name}. ${agent?'Priorité réévaluée par l’orchestrateur.':'Ordre prédéfini.'}`);await wait(230);
+   stage('weather');let m;try{m=await meteo(d,date);log('OUTIL · MÉTÉO',`${d.name} : ${m.temp} °C, pluie ${m.rain} %, vent ${m.wind} km/h, soleil ${m.sun} h. Source : Open-Meteo.`)}
+   catch(e){log('OUTIL · MÉTÉO',`${d.name} : données indisponibles (${e.message}). Je passe à la destination suivante.`,'warn');mark(d,false,decisions);continue}
+   const weatherOK=m.temp>=t.temp&&m.rain<=t.rain&&m.wind<=t.wind;
+   if(!weatherOK){stage('evaluate');const why=[m.temp<t.temp?'température trop basse':null,m.rain>t.rain?'pluie excessive':null,m.wind>t.wind?'vent excessif':null].filter(Boolean).join(', ');log('ÉVALUATION → REJET',`${d.name} : ${why}. ${agent?'Je cherche une autre destination.':'Étape suivante de la liste fixe.'}`,'warn');records.push({name:d.name,m,valid:false,options:null});render();mark(d,false,decisions);
+    if(agent){order.sort((a,b)=>priority(b,t,seen)-priority(a,t,seen))}continue}
+   stage('mobility');log('OUTIL · MOBILITÉ',`${d.name} satisfait la météo. Je consulte IGN pour la voiture et compare les estimations train/avion.`);
+   const roadData=await road(d);if(!roadData)log('SOURCE · IGN','Itinéraire voiture indisponible : la voiture est exclue du classement, sans inventer de durée.','warn');
+   const options=modes(d,roadData,t.people).map(x=>({...x,pass:x.hours<=t.travel&&x.cost<=t.budget}));
+   stage('evaluate');const possible=options.filter(x=>x.pass).sort((a,b)=>a.cost-b.cost);
+   const valid=possible.length>0;const result={name:d.name,m,options,valid,score:valid?score(possible[0],m,t):-999};
+   records.push(result);mark(d,valid,decisions);
+   for(const mkr of adviceMarks){
+     if(mkr.getLatLng().distanceTo(L.latLng(d.lat,d.lon))<200){
+       mkr.setStyle({color:valid?'#0d6d46':'#8a5b1b',fillColor:valid?'#48e89b':'#ffcb76'});
+       mkr.bindPopup(`${d.name} — ${valid?'confirmée conforme après relance':'non conforme lors de la relance'}`);
+     }
+   }$('nGood').textContent=records.filter(r=>r.valid).length;render();
+   log(valid?'ÉVALUATION → SOLUTION':'ÉVALUATION → RECHERCHE',valid?`${d.name} : ${possible.map(x=>x.mode+' '+x.hours+' h / '+x.cost+' €').join(' ; ')}. ${agent?'Je vérifie si cette solution est suffisante.':'Je poursuis le parcours fixe.'}`:`${d.name} : aucun mode connu ne respecte simultanément durée et budget. ${agent?'Je change de destination.':'Je poursuis la liste.'}`,valid?'good':'warn');
+   if(valid&&(!best||result.score>best.score))best=result;
+   if(agent&&valid){log('ORCHESTRATEUR · ARRÊT',`Objectif atteint avec ${d.name}. J'arrête la boucle après ${decisions} décision(s), sans interroger inutilement les autres destinations.`,'good');break}
+   if(agent){order.sort((a,b)=>priority(b,t,seen)-priority(a,t,seen));log('ORCHESTRATEUR · BOUCLE',`Les observations actualisent les priorités ; prochaine ville : ${order.find(x=>!seen.has(x.name))?.name||'aucune'}.`)}
+   await wait(180);
+  }
+  stage('plan');const count=records.filter(r=>r.valid).length;$('status').textContent=count?`Mission terminée : ${count} solution(s) validée(s), ${decisions} décision(s).`:`Mission terminée sans solution validée (${decisions} décision(s)).`;
+  log('SYNTHÈSE',count?`Meilleure solution observée : ${records.filter(r=>r.valid).sort((a,b)=>b.score-a.score)[0].name}. Attention : train, avion et prix sont estimés.`:'Aucune solution conforme parmi les villes évaluées. Consultez les refus expliqués et la suggestion de révision dans les recommandations.','good');
+ }finally{busy=false;$('start').disabled=false;stage('');render()}
+}
+$('start').addEventListener('click',run);
+// Dès qu'un critère change, les résultats précédents ne sont plus présentés comme actuels.
+for(const el of document.querySelectorAll('#mode,#date,#temp,#rain,#travel,#budget,#wind,#limit,#people')){
+ el.addEventListener('input',()=>{if(busy)return;records=[];['nDec','nCity','nGood'].forEach(id=>$(id).textContent='0');$('status').textContent='Critères modifiés : cliquez sur « Lancer la mission » pour calculer de nouveaux résultats.';$('results').textContent='En attente du prochain lancement.';$('log').replaceChildren();log('PARAMÈTRES MODIFIÉS','Les résultats de la mission précédente ont été effacés.');marks.forEach(m=>map?.removeLayer(m));marks=[];adviceMarks.forEach(m=>map?.removeLayer(m));adviceMarks=[];stage('');});
+}
+
+getJSON('/api/status').then(j=>{$('health').textContent='● Worker en ligne' + (j.version?' · '+j.version:'');$('health').style.color='#6ee5ac'}).catch(()=>{$('health').textContent='● Worker à déployer';$('health').style.color='#ffcb76'});
+</script></body></html>
