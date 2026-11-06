@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Que se passe-t-il quand vous posez une question à une IA ? — démonstrateur</title>
+<style>
+:root{
+  --papier:#FCFBFD; --encre:#3B1A55; --violet:#6A2E86; --vclair:#8B3FA8;
+  --rose:#C01680; --rosecl:#E25CA5; --bleu:#2F6FA3; --bleupale:#DCE6F3;
+  --lilas:#F1EAF6; --gris:#6B7280; --grisbord:#D9DEE4; --vert:#2E7D4F; --rouge:#A02020;
+  --serif: "Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+  --sans: "Avenir Next","Segoe UI","Helvetica Neue",Helvetica,Arial,sans-serif;
+  --mono: ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:4rem}
+body{margin:0;background:var(--papier);color:#26203a;font-family:var(--serif);
+  font-size:17px;line-height:1.6}
+.page{max-width:920px;margin:0 auto;padding:0 20px 64px}
+
+/* ---- en-tête ---- */
+header{padding:48px 0 28px;border-bottom:1px solid var(--grisbord)}
+.collection{font-family:var(--sans);font-size:.82rem;color:var(--vclair);font-weight:600;margin:0 0 14px}
+h1{font-family:var(--sans);color:var(--encre);font-weight:700;font-size:clamp(1.7rem,4.2vw,2.5rem);
+  line-height:1.15;margin:0 0 14px;letter-spacing:-.01em;max-width:18em}
+.intro{max-width:36em;margin:0;color:#3f3656}
+nav.etapes{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--papier) 92%,transparent);
+  backdrop-filter:blur(6px);border-bottom:1px solid var(--grisbord);margin:0 -20px;padding:0 20px}
+nav.etapes ol{list-style:none;margin:0;padding:10px 0;display:flex;gap:6px;overflow-x:auto}
+nav.etapes a{display:flex;align-items:center;gap:8px;white-space:nowrap;font-family:var(--sans);
+  font-size:.88rem;color:var(--violet);text-decoration:none;padding:6px 12px 6px 6px;border-radius:999px}
+nav.etapes a:hover{background:var(--lilas)}
+nav.etapes a span{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;
+  background:var(--violet);color:#fff;font-size:.75rem;font-weight:700}
+
+/* ---- sections ---- */
+section{padding:52px 0 8px}
+.num{font-family:var(--sans);font-weight:700;color:var(--rose);font-size:.9rem;margin:0}
+h2{font-family:var(--sans);color:var(--encre);font-size:1.55rem;line-height:1.2;margin:4px 0 10px}
+section > p{max-width:38em;margin:0 0 18px}
+.panneau{background:#fff;border:1px solid var(--grisbord);border-radius:10px;padding:22px}
+.consigne{font-family:var(--sans);font-size:.85rem;color:var(--gris);margin:0 0 10px}
+.aretenir{border-left:3px solid var(--rose);padding:4px 0 4px 16px;margin:22px 0 0;max-width:38em;
+  font-style:italic;color:var(--encre)}
+.renvoi{font-family:var(--sans);font-size:.8rem;color:var(--gris);margin-top:10px}
+
+button,.btn{font-family:var(--sans);font-size:.9rem;border:1px solid var(--violet);background:#fff;
+  color:var(--violet);padding:7px 14px;border-radius:6px;cursor:pointer}
+button:hover{background:var(--lilas)}
+button.plein{background:var(--violet);color:#fff}
+button.plein:hover{background:var(--encre)}
+button:disabled{opacity:.4;cursor:default;background:#fff;color:var(--violet)}
+button.plein:disabled{background:var(--violet);color:#fff}
+button:focus-visible,input:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--rose);outline-offset:2px}
+button[aria-pressed="true"]{background:var(--encre);color:#fff;border-color:var(--encre)}
+.rangee{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+
+/* ---- 1. tokens ---- */
+#saisie{width:100%;font-family:var(--serif);font-size:1.15rem;padding:10px 12px;border:1px solid var(--grisbord);
+  border-radius:6px;color:var(--encre);background:var(--papier)}
+.exemples{margin:10px 0 18px}
+.exemples button{font-size:.8rem;padding:4px 10px;border-color:var(--grisbord);color:#4b4263}
+.tuiles{display:flex;flex-wrap:wrap;gap:6px 4px;min-height:74px}
+.tuile{display:flex;flex-direction:column;align-items:center;gap:3px}
+.tuile b{font-family:var(--mono);font-weight:500;font-size:.95rem;padding:4px 7px;border-radius:5px;
+  border:1px solid var(--encre);white-space:pre;color:var(--encre)}
+.tuile i{font-family:var(--sans);font-style:normal;font-size:.7rem;color:var(--violet)}
+.tuile .esp{color:var(--rosecl)}
+.compteur{font-family:var(--sans);font-size:.9rem;color:#4b4263;margin-top:14px}
+.compteur strong{color:var(--rose);font-size:1.1rem}
+
+/* ---- 2. attention ---- */
+.att-grille{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:22px;align-items:start}
+@media (max-width:720px){.att-grille{grid-template-columns:minmax(0,1fr)}}
+.att-defil{overflow-x:auto}
+#att-svg{width:100%;min-width:500px;height:auto;display:block;overflow:visible}
+#att-svg .mot{font-family:var(--serif);font-size:17px;cursor:pointer;fill:#3f3656}
+#att-svg .mot.actif{fill:var(--violet);font-weight:700}
+#att-svg .cadre{fill:none;stroke:var(--violet);stroke-width:1.4}
+.poids{font-family:var(--sans);font-size:.8rem;margin-top:8px}
+.poids div{display:grid;grid-template-columns:5.5em 1fr 3em;gap:8px;align-items:center;margin:2px 0}
+.poids span.b{height:9px;background:var(--rosecl);border-radius:2px}
+.poids em{font-style:normal;color:var(--gris);text-align:right}
+#emb-svg{width:100%;height:auto;background:var(--papier);border:1px solid var(--grisbord);border-radius:8px}
+.curseur{font-family:var(--sans);font-size:.85rem;color:#4b4263;display:flex;align-items:center;gap:10px;margin-top:10px}
+.curseur input{flex:1;accent-color:var(--violet)}
+.curseur output{min-width:4.5em;text-align:right;color:var(--violet);font-weight:600}
+
+/* ---- 3. génération ---- */
+.contexte{font-family:var(--serif);font-size:1.25rem;line-height:1.9;color:var(--encre);min-height:3.4em;
+  padding:12px 14px;background:var(--papier);border-radius:8px;border:1px solid var(--grisbord)}
+.contexte .tk{border-bottom:2px solid transparent;white-space:pre-wrap}
+.contexte .tk.gen{border-bottom-color:var(--vclair)}
+.contexte .tk.neuf{background:color-mix(in srgb,var(--rosecl) 25%,transparent);border-bottom-color:var(--rose)}
+.contexte .curs{display:inline-block;width:2px;height:1.1em;background:var(--rose);vertical-align:-3px;margin-left:2px;animation:cl 1s steps(1) infinite}
+@keyframes cl{50%{opacity:0}}
+.eventail{width:100%;height:auto;display:block;margin:10px 0 4px}
+.eventail text{font-family:var(--mono);font-size:14px}
+.eventail .pct{font-family:var(--sans);font-size:12px;fill:var(--gris)}
+.reglages{display:grid;grid-template-columns:1fr 1fr;gap:6px 26px;margin:6px 0 14px}
+@media (max-width:620px){.reglages{grid-template-columns:1fr}}
+.reglages small{display:block;font-family:var(--sans);font-size:.75rem;color:var(--gris);margin-top:-2px}
+.historique{font-family:var(--serif);font-size:.98rem;margin:16px 0 0;padding:0;list-style:none}
+.historique li{padding:5px 0;border-top:1px dashed var(--grisbord);color:#3f3656}
+.historique li span{font-family:var(--sans);font-size:.72rem;color:var(--gris);margin-left:8px}
+
+/* ---- 4. mémoire / document ---- */
+.bascule{display:inline-flex;border:1px solid var(--encre);border-radius:7px;overflow:hidden}
+.bascule button{border:0;border-radius:0}
+.question{font-family:var(--serif);font-size:1.2rem;color:var(--encre);margin:14px 0}
+.doc{font-size:.95rem;background:var(--bleupale);border-radius:6px;padding:12px 14px;margin:0 0 12px;
+  color:#233a55;border-left:3px solid var(--bleu)}
+.doc b.src{font-family:var(--sans);font-size:.72rem;color:var(--bleu);display:block;margin-bottom:4px}
+.doc mark{background:color-mix(in srgb,var(--rosecl) 30%,transparent);color:inherit;border-radius:2px}
+.reponse{font-size:1.15rem;min-height:2.2em;color:var(--encre);margin:6px 0}
+.verdict{font-family:var(--sans);font-size:.85rem;padding:8px 12px;border-radius:6px;margin-top:6px}
+.verdict.faux{background:#FBEDED;color:var(--rouge)}
+.verdict.ok{background:#E9F4EE;color:var(--vert)}
+[hidden]{display:none!important}
+
+footer{margin-top:64px;padding-top:18px;border-top:1px solid var(--grisbord);font-family:var(--sans);
+  font-size:.8rem;color:var(--gris);line-height:1.5}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <p class="collection">LAB'IA Loire Valley, démonstrateur de l'article de vulgarisation</p>
+  <h1>Que se passe-t-il quand vous posez une question à une IA&nbsp;?</h1>
+  <p class="intro">Quatre manipulations, dans l'ordre où le modèle travaille : il découpe votre phrase,
+  met ses morceaux en relation, prédit la suite un morceau à la fois, et répond d'autant mieux
+  qu'on lui met la bonne matière sous les yeux.</p>
+</header>
+
+<nav class="etapes" aria-label="Étapes">
+  <ol>
+    <li><a href="#decouper"><span>1</span>Découper</a></li>
+    <li><a href="#relier"><span>2</span>Mettre en relation</a></li>
+    <li><a href="#predire"><span>3</span>Prédire la suite</a></li>
+    <li><a href="#appuyer"><span>4</span>Mémoire ou document</a></li>
+  </ol>
+</nav>
+
+<!-- ================================================================= 1 -->
+<section id="decouper">
+  <p class="num">Étape 1</p>
+  <h2>La phrase devient des morceaux</h2>
+  <p>Le modèle ne lit ni vos mots ni vos lettres. Il reçoit une suite de fragments, les
+  <em>tokens</em>, chacun remplacé par un numéro. Tapez une phrase et regardez-la se découper.</p>
+  <div class="panneau">
+    <label class="consigne" for="saisie">Votre phrase</label>
+    <input id="saisie" type="text" value="Qui a inventé Internet ?" autocomplete="off" spellcheck="false">
+    <div class="exemples rangee" aria-label="Exemples">
+      <button data-ex="Qui a inventé Internet ?">Qui a inventé Internet ?</button>
+      <button data-ex="Combien de r dans strawberry ?">Combien de r dans strawberry ?</button>
+      <button data-ex="La Révolution française commence en 1789.">Une date</button>
+      <button data-ex="Anticonstitutionnellement, évidemment.">Un mot très long</button>
+    </div>
+    <div class="tuiles" id="tuiles" aria-live="polite"></div>
+    <p class="compteur" id="compteur"></p>
+  </div>
+  <p class="aretenir">Le <span style="color:var(--rosecl)">␣</span> rose marque l'espace : il fait partie du token.
+  Remarquez « strawberry » coupé en morceaux opaques. Le modèle ne voit pas ses « r », il ne peut
+  donc pas les compter en les regardant.</p>
+  <p class="renvoi">Découpage simplifié et identifiants fictifs : chaque vrai modèle a son propre vocabulaire. Article, section 1.</p>
+</section>
+
+<!-- ================================================================= 2 -->
+<section id="relier">
+  <p class="num">Étape 2</p>
+  <h2>Chaque morceau va chercher ce qui l'éclaire</h2>
+  <p>« Avocat » entre dans le modèle toujours avec la même position de départ. C'est le reste de
+  la phrase qui le déplace, couche après couche, vers le bon sens. Cliquez sur un mot pour voir où
+  il « regarde », puis faites avancer les couches.</p>
+  <div class="panneau">
+    <div class="rangee" role="group" aria-label="Phrase">
+      <button id="ph1" aria-pressed="true">L'avocat a plaidé…</button>
+      <button id="ph2" aria-pressed="false">J'ai coupé l'avocat…</button>
+    </div>
+    <div class="att-grille" style="margin-top:14px">
+      <div>
+        <div class="att-defil"><svg id="att-svg" viewBox="0 0 560 150" role="img" aria-label="Arcs d'attention"></svg></div>
+        <div class="poids" id="poids"></div>
+      </div>
+      <div>
+        <svg id="emb-svg" viewBox="0 0 300 240" role="img" aria-label="Position du mot avocat"></svg>
+        <div class="curseur">
+          <label for="couche">Couches traversées</label>
+          <input id="couche" type="range" min="0" max="6" step="1" value="0">
+          <output id="couche-v">0 / 6</output>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="aretenir">Même mot, même point de départ, deux arrivées différentes : c'est le contexte
+  qui fabrique le sens.</p>
+  <p class="renvoi">Poids fabriqués à la main pour une tête d'attention. Un vrai modèle en calcule des dizaines, sur des dizaines de couches. Article, sections 2 et 3.</p>
+</section>
+
+<!-- ================================================================= 3 -->
+<section id="predire">
+  <p class="num">Étape 3</p>
+  <h2>Un token, puis le suivant, puis le suivant</h2>
+  <p>À chaque tour, le réseau donne une probabilité pour chaque suite possible. Un réglage extérieur,
+  le décodage, en retient une ; elle rejoint le contexte et tout recommence. Jouez avec la
+  température&nbsp;: basse, la phrase est toujours la même ; haute, l'improbable devient possible.</p>
+  <div class="panneau">
+    <div class="contexte" id="contexte" aria-live="polite"></div>
+    <svg id="eventail" class="eventail" viewBox="0 0 640 260" role="img" aria-label="Probabilités des tokens candidats"></svg>
+    <div class="reglages">
+      <div>
+        <div class="curseur"><label for="temp">Température</label>
+          <input id="temp" type="range" min="0.1" max="2" step="0.05" value="1"><output id="temp-v">1,00</output></div>
+        <small>Accentue ou aplatit les écarts entre candidats.</small>
+      </div>
+      <div>
+        <div class="curseur"><label for="topp">Top-p</label>
+          <input id="topp" type="range" min="0.3" max="1" step="0.05" value="0.95"><output id="topp-v">0,95</output></div>
+        <small>On ne tire que parmi les candidats qui cumulent cette part de probabilité (en pointillé : écartés).</small>
+      </div>
+    </div>
+    <div class="rangee">
+      <button class="plein" id="b-tirer">Tirer le token suivant</button>
+      <button id="b-max">Prendre le plus probable</button>
+      <button id="b-fin">Écrire jusqu'au point</button>
+      <button id="b-reset">Recommencer</button>
+    </div>
+    <ul class="historique" id="historique" aria-label="Phrases déjà produites"></ul>
+  </div>
+  <p class="aretenir">Relancez plusieurs fois la même phrase : les réponses diffèrent sans que le modèle ait changé.
+  C'est l'échantillonnage, pas un caprice.</p>
+  <p class="renvoi">Mini-modèle jouet : une trentaine de suites écrites à la main, qui ne tiennent compte que du dernier token. Article, sections 4 et 5.</p>
+</section>
+
+<!-- ================================================================= 4 -->
+<section id="appuyer">
+  <p class="num">Étape 4</p>
+  <h2>De mémoire, ou document sous les yeux</h2>
+  <p>Même mécanisme, deux régimes. Sans document, le modèle reconstitue la réponse à partir de ce qui
+  est fréquent dans ses données d'entraînement. Avec un extrait pertinent dans le contexte, il n'a plus
+  qu'à s'appuyer dessus.</p>
+  <div class="panneau">
+    <div class="bascule" role="group" aria-label="Mode">
+      <button id="m-mem" aria-pressed="true">De mémoire</button>
+      <button id="m-doc" aria-pressed="false">Avec un extrait de document</button>
+    </div>
+    <p class="question">« Qui a inventé Internet ? »</p>
+    <div class="doc" id="doc" hidden>
+      <b class="src">Extrait placé dans le contexte</b>
+      <span id="doc-txt"></span>
+    </div>
+    <svg id="eventail2" class="eventail" viewBox="0 0 640 220" role="img" aria-label="Probabilités du premier token de la réponse"></svg>
+    <div class="rangee"><button class="plein" id="b-rep">Générer la réponse</button></div>
+    <p class="reponse" id="reponse" aria-live="polite"></p>
+    <div class="verdict" id="verdict" hidden></div>
+  </div>
+  <p class="aretenir">Une forte probabilité linguistique n'est pas une preuve factuelle.</p>
+  <p class="renvoi">Probabilités illustratives. Article, sections 6, 9 et 12 (le RAG).</p>
+</section>
+
+<footer>
+  Ce démonstrateur n'embarque aucun vrai modèle : découpages, poids d'attention et probabilités sont
+  fabriqués à la main pour rendre les mécanismes visibles. Il accompagne l'article « Que se passe-t-il
+  réellement lorsque vous posez une question à une IA ? », Frédéric Ros, Technopole d'Orléans,
+  LAB'IA Loire Valley, 2026. Fonctionne hors ligne, dans n'importe quel navigateur récent.
+</footer>
+</div>
+
+<script>
+(() => {
+"use strict";
+const $ = s => document.querySelector(s);
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs = {}, parent) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+};
+const fmt = (x, d = 2) => x.toFixed(d).replace(".", ",");
+const reduit = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ================================================================ 1. tokens */
+const SUFFIXES = ["ellement","ement","ations","ation","tions","tion","iques","ique","ées","ée","és",
+                  "ent","ais","ait","er","é","s"];
+const ENTIERS = new Set(["qui","a","de","la","le","les","un","une","en","dans","est","et","à","du","des",
+  "combien","internet","ai","il","elle","je","vous","ce","que","pour","sur","au","commence","ia"]);
+function decoupeMot(m) {
+  if (/^\d+$/.test(m)) return m.match(/.{1,2}/g);           // les nombres partent en morceaux
+  const low = m.toLowerCase();
+  if (ENTIERS.has(low) || m.length <= 4) return [m];
+  if (low === "strawberry") return [m.slice(0,3), m.slice(3,6), m.slice(6)];
+  for (const s of SUFFIXES) {
+    if (low.endsWith(s) && m.length - s.length >= 3) {
+      const tige = m.slice(0, m.length - s.length);
+      return [...coupeLong(tige), m.slice(m.length - s.length)];
+    }
+  }
+  return coupeLong(m);
+}
+function coupeLong(m) {
+  if (m.length <= 7) return [m];
+  const out = []; let i = 0;
+  while (i < m.length) { const n = m.length - i > 7 ? 5 : m.length - i; out.push(m.slice(i, i + n)); i += n; }
+  return out;
+}
+function tokenise(txt) {
+  const out = [];
+  const re = /(\s*)([A-Za-zÀ-ÖØ-öø-ÿœŒ'’\-]+|\d+|[^\sA-Za-zÀ-ÖØ-öø-ÿ\d])/g;
+  let r;
+  while ((r = re.exec(txt))) {
+    const esp = r[1].length ? " " : "";
+    const morceaux = /[A-Za-zÀ-ÿœŒ\d]/.test(r[2]) ? r[2].split(/(?<=['’])/).flatMap(decoupeMot) : [r[2]];
+    morceaux.forEach((m, i) => out.push((i === 0 ? esp : "") + m));
+  }
+  return out;
+}
+function ident(t) {                                        // identifiant fictif, stable
+  let h = 2166136261;
+  for (const c of t) { h ^= c.codePointAt(0); h = Math.imul(h, 16777619); }
+  return (h >>> 0) % 49000 + 200;
+}
+function majTokens() {
+  const txt = $("#saisie").value;
+  const toks = tokenise(txt);
+  const box = $("#tuiles"); box.textContent = "";
+  toks.forEach(t => {
+    const d = document.createElement("div"); d.className = "tuile";
+    const b = document.createElement("b");
+    if (t.startsWith(" ")) { const s = document.createElement("span"); s.className = "esp"; s.textContent = "␣"; b.appendChild(s); b.append(t.slice(1)); }
+    else b.textContent = t;
+    const i = document.createElement("i"); i.textContent = ident(t);
+    d.append(b, i); box.appendChild(d);
+  });
+  $("#compteur").innerHTML = `<strong>${[...txt].length}</strong> caractères &nbsp;→&nbsp; <strong>${toks.length}</strong> tokens`;
+}
+$("#saisie").addEventListener("input", majTokens);
+document.querySelectorAll("[data-ex]").forEach(b => b.addEventListener("click", () => {
+  $("#saisie").value = b.dataset.ex; majTokens();
+}));
+majTokens();
+
+/* ============================================================ 2. attention */
+const PHRASES = [
+  { mots: ["L'","avocat","a","plaidé","toute","la","matinée","devant","le","juge"],
+    cible: "justice",
+    poids: { 1: [.04,.08,.06,.34,.02,.02,.04,.06,.04,.30] } },
+  { mots: ["J'ai","coupé","l'","avocat","bien","mûr","pour","la","salade"],
+    cible: "cuisine",
+    poids: { 3: [.05,.20,.03,.08,.05,.30,.03,.02,.24] } }
+];
+let ph = 0, motActif = 1;
+function poidsPour(p, i) {
+  if (p.poids[i]) return p.poids[i];
+  const w = p.mots.map((_, j) => Math.exp(-Math.abs(i - j) / 1.3) * (j === i ? .5 : 1) * (p.mots[j].length > 3 ? 1.4 : 1));
+  const s = w.reduce((a, b) => a + b, 0); return w.map(x => x / s);
+}
+function dessineAttention() {
+  const p = PHRASES[ph], svg = $("#att-svg"); svg.textContent = "";
+  const y = 125; let x = 8; const pos = [];
+  const mes = el("text", { x: -999, y: -999, class: "mot" }, svg);
+  p.mots.forEach(m => { mes.textContent = m; const w = mes.getComputedTextLength() || m.length * 9; pos.push({ x, w }); x += w + 12; });
+  svg.removeChild(mes);
+  const echelle = Math.min(1, 544 / x);
+  svg.setAttribute("viewBox", `0 0 ${Math.max(560, x)} 150`);
+  const w = poidsPour(p, motActif);
+  const cx = i => pos[i].x + pos[i].w / 2;
+  p.mots.forEach((_, j) => {
+    if (j === motActif || w[j] < .015) return;
+    const x0 = cx(motActif), x1 = cx(j), h = Math.min(100, 22 + Math.abs(x1 - x0) * .35);
+    el("path", { d: `M${x0},${y - 22} C${x0},${y - 22 - h} ${x1},${y - 22 - h} ${x1},${y - 22}`,
+      fill: "none", stroke: w[j] > .15 ? "var(--rose)" : "var(--vclair)",
+      "stroke-width": (1 + w[j] * 14).toFixed(1), "stroke-opacity": (.25 + w[j] * 2.2).toFixed(2),
+      "stroke-linecap": "round" }, svg);
+  });
+  p.mots.forEach((m, j) => {
+    if (j === motActif) el("rect", { x: pos[j].x - 4, y: y - 19, width: pos[j].w + 8, height: 26, rx: 4, class: "cadre" }, svg);
+    const t = el("text", { x: pos[j].x, y, class: "mot" + (j === motActif ? " actif" : ""), tabindex: 0, role: "button" }, svg);
+    t.textContent = m;
+    const choisir = () => { motActif = j; dessineAttention(); };
+    t.addEventListener("click", choisir);
+    t.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); choisir(); } });
+  });
+  // barres
+  const box = $("#poids"); box.innerHTML = `<div style="grid-template-columns:1fr"><span style="color:var(--gris)">Où regarde « ${p.mots[motActif]} » :</span></div>`;
+  p.mots.map((m, j) => ({ m, v: w[j] })).sort((a, b) => b.v - a.v).slice(0, 4).forEach(o => {
+    const r = document.createElement("div");
+    r.innerHTML = `<span>${o.m}</span><span class="b" style="width:${Math.round(o.v * 260)}%"></span><em>${Math.round(o.v * 100)} %</em>`;
+    box.appendChild(r);
+  });
+  dessineEmbedding();
+}
+const GROUPES = {
+  justice: { c: [72, 62], mots: [["juge",52,48],["tribunal",96,44],["plaider",60,86],["procès",104,78]], coul: "var(--bleu)" },
+  cuisine: { c: [226, 176], mots: [["salade",206,160],["fruit",250,156],["mûr",214,200],["tomate",256,196]], coul: "var(--vert)" }
+};
+function dessineEmbedding() {
+  const svg = $("#emb-svg"); svg.textContent = "";
+  const n = +$("#couche").value; $("#couche-v").textContent = `${n} / 6`;
+  for (const k in GROUPES) {
+    const g = GROUPES[k];
+    el("circle", { cx: g.c[0], cy: g.c[1], r: 46, fill: g.coul, "fill-opacity": .07 }, svg);
+    g.mots.forEach(([m, x, y]) => {
+      el("circle", { cx: x, cy: y, r: 3.2, fill: g.coul }, svg);
+      const t = el("text", { x: x + 6, y: y + 4, "font-size": 11, "font-family": "var(--sans)", fill: "#4b4263" }, svg); t.textContent = m;
+    });
+  }
+  const dep = [150, 120], arr = GROUPES[PHRASES[ph].cible].c;
+  const ease = t => 1 - Math.pow(1 - t, 2);
+  const chemin = [];
+  for (let i = 0; i <= n; i++) { const t = ease(i / 6); chemin.push([dep[0] + (arr[0] - dep[0]) * t + Math.sin(i * 1.7) * 6 * (1 - t), dep[1] + (arr[1] - dep[1]) * t]); }
+  el("circle", { cx: dep[0], cy: dep[1], r: 5, fill: "none", stroke: "var(--gris)", "stroke-dasharray": "2 2" }, svg);
+  const td = el("text", { x: dep[0] + 8, y: dep[1] - 8, "font-size": 10, "font-family": "var(--sans)", fill: "var(--gris)" }, svg); td.textContent = "départ";
+  if (chemin.length > 1) el("polyline", { points: chemin.map(p => p.join(",")).join(" "), fill: "none", stroke: "var(--rose)", "stroke-width": 1.5, "stroke-dasharray": "3 3" }, svg);
+  chemin.forEach((p, i) => el("circle", { cx: p[0], cy: p[1], r: i === n ? 6.5 : 2.2, fill: i === n ? "var(--rose)" : "var(--rosecl)" }, svg));
+  const pn = chemin[n];
+  const ta = el("text", { x: pn[0] + 9, y: pn[1] + 4, "font-size": 12, "font-weight": 700, "font-family": "var(--sans)", fill: "var(--rose)" }, svg); ta.textContent = "avocat";
+}
+function choisirPhrase(i) {
+  ph = i; motActif = i === 0 ? 1 : 3;
+  $("#ph1").setAttribute("aria-pressed", i === 0); $("#ph2").setAttribute("aria-pressed", i === 1);
+  dessineAttention();
+}
+$("#ph1").addEventListener("click", () => choisirPhrase(0));
+$("#ph2").addEventListener("click", () => choisirPhrase(1));
+$("#couche").addEventListener("input", dessineEmbedding);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(dessineAttention); else dessineAttention();
+
+/* =========================================================== 3. génération */
+// Mini-modèle jouet : scores (logits) des suites possibles selon le dernier token.
+const T = {
+  " un":        {" café":3.0," thé":2.2," verre":1.7," chocolat":1.1," jus":.9," grand":.6," litre":-.6," dinosaure":-3.2},
+  " café":      {" noir":1.9,".":1.7," chaud":1.4," avant":1.3," en":1.2," au":.8," sucré":.7},
+  " thé":       {" vert":2.1,".":1.4," chaud":1.3," avant":1.0," en":.9},
+  " verre":     {" d'eau":2.7," de":1.6,".":.2," avant":.4},
+  " chocolat":  {" chaud":2.6,".":1.0," avant":.7},
+  " jus":       {" d'orange":2.8," de pomme":1.4,".":.2},
+  " grand":     {" café":2.3," verre":1.8," bol":1.5," thé":1.0},
+  " bol":       {" de":2.6,".":.3},
+  " litre":     {" de lait":2.2," d'eau":2.1},
+  " dinosaure": {".":1.2," en":1.0," avant":.6},
+  " de":        {" lait":2.0," chocolat":1.0," soupe":-.6},
+  " avant":     {" d'aller":2.0," le":1.5," la":1.0},
+  " le":        {" travail":2.0," bureau":1.6," départ":.9},
+  " la":        {" réunion":2.0," douche":1.2},
+  " d'aller":   {" travailler":2.0," au":1.4},
+  " au":        {" bureau":2.0," lait":1.3," soleil":1.0," comptoir":.8},
+  " en":        {" lisant":1.8," terrasse":1.6," regardant":1.0," vitesse":.9},
+  " lisant":    {" mes":1.8," le":.8},
+  " mes":       {" mails":2.0," messages":1.6},
+  " regardant": {" dehors":2.2," la":.6}
+};
+const FINS = [" noir"," chaud"," vert"," sucré"," d'eau"," d'orange"," lait"," de pomme"," de lait"," soupe"];
+FINS.forEach(k => T[k] = {".":2.1," avant":1.5," en":1.2," au":.5});
+const DEFAUT = {".":2.4," avec":.4};
+T[" avec"] = {" plaisir":2.2," un":.2};
+const DEPART = ["Ce"," matin",","," j'ai"," bu"," un"];
+let ctx = [], nouveaux = new Set(), dernierChoix = null, occupe = false, derniereDistrib = null;
+
+function distrib(dernier) {
+  const logits = T[dernier] || DEFAUT;
+  const temp = +$("#temp").value, topp = +$("#topp").value;
+  const ent = Object.entries(logits).map(([t, l]) => ({ t, l }));
+  const mx = Math.max(...ent.map(e => e.l));
+  ent.forEach(e => e.e = Math.exp((e.l - mx) / temp));
+  const s = ent.reduce((a, e) => a + e.e, 0);
+  ent.forEach(e => e.p = e.e / s);
+  ent.sort((a, b) => b.p - a.p);
+  let cum = 0; ent.forEach(e => { e.garde = cum < topp - 1e-9; cum += e.p; });
+  return ent;
+}
+function dessineEventail(svg, ent, choisi, opts = {}) {
+  svg.textContent = "";
+  const W = Math.round(Math.min(640, Math.max(340, svg.clientWidth || 640)));
+  const n = ent.length, H = Math.max(opts.h || 180, n * 30 + 20);
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const nx = W < 500 ? 40 : 60, ny = H / 2, lx = Math.round(W * (W < 500 ? .42 : .52));
+  const bx = lx + (W < 500 ? 105 : 150), bl = W < 500 ? 70 : 110;
+  // halo et nœud
+  [34, 24, 15].forEach((r, i) => el("circle", { cx: nx, cy: ny, r, fill: "var(--rosecl)", "fill-opacity": [.08, .13, .22][i] }, svg));
+  el("circle", { cx: nx, cy: ny, r: 9, fill: "var(--violet)", stroke: "var(--encre)", "stroke-width": 1.5 }, svg);
+  el("circle", { cx: nx, cy: ny, r: 3, fill: "#fff" }, svg);
+  const t0 = el("text", { x: 2, y: ny + 52, class: "pct" }, svg); t0.textContent = opts.label || "réseau";
+  ent.forEach((e, i) => {
+    const y = 20 + (i + .5) * ((H - 40) / n);
+    const estChoisi = choisi && e.t === choisi;
+    const larg = 1 + Math.min(e.p, .8) * 16;
+    el("path", { d: `M${nx + 10},${ny} C${nx + (lx - nx) * .45},${ny} ${lx - (lx - nx) * .45},${y} ${lx - 8},${y}`, fill: "none",
+      stroke: estChoisi ? "var(--rose)" : (e.garde ? "var(--violet)" : "var(--gris)"),
+      "stroke-width": larg.toFixed(1), "stroke-opacity": estChoisi ? .95 : (e.garde ? .2 + e.p * 1.4 : .25),
+      "stroke-dasharray": e.garde ? "" : "3 4", "stroke-linecap": "round" }, svg);
+    const lab = el("text", { x: lx, y: y + 5, fill: estChoisi ? "var(--rose)" : (e.garde ? "var(--encre)" : "var(--gris)"),
+      "font-weight": estChoisi ? 700 : 400 }, svg);
+    lab.textContent = e.t === "." ? "." : e.t.replace(/^ /, "␣");
+    el("rect", { x: bx, y: y - 6, width: Math.max(1, e.p * bl), height: 12, rx: 2,
+      fill: estChoisi ? "var(--rose)" : "var(--vclair)", "fill-opacity": e.garde ? .8 : .25 }, svg);
+    const pc = el("text", { x: bx + Math.max(1, e.p * bl) + 6, y: y + 4, class: "pct" }, svg);
+    pc.textContent = (e.p < .001 ? "<0,1" : fmt(e.p * 100, e.p < .1 ? 1 : 0)) + " %";
+  });
+}
+function rendContexte() {
+  const box = $("#contexte"); box.textContent = "";
+  ctx.forEach((t, i) => {
+    const s = document.createElement("span");
+    s.className = "tk" + (i >= DEPART.length ? " gen" : "") + (nouveaux.has(i) ? " neuf" : "");
+    s.textContent = t; box.appendChild(s);
+  });
+  if (ctx[ctx.length - 1] !== ".") { const c = document.createElement("span"); c.className = "curs"; box.appendChild(c); }
+  const dernier = ctx[ctx.length - 1];
+  if (dernier === "." && derniereDistrib) {
+    dessineEventail($("#eventail"), derniereDistrib, ".", { label: "phrase terminée" });
+  } else dessineEventail($("#eventail"), distrib(dernier), dernierChoix);
+  $("#b-tirer").disabled = $("#b-max").disabled = $("#b-fin").disabled = dernier === "." || occupe;
+}
+function tire(ent, glouton) {
+  if (glouton) return ent[0].t;
+  const g = ent.filter(e => e.garde), s = g.reduce((a, e) => a + e.p, 0);
+  let r = Math.random() * s;
+  for (const e of g) { r -= e.p; if (r <= 0) return e.t; }
+  return g[g.length - 1].t;
+}
+function pas(glouton) {
+  const dernier = ctx[ctx.length - 1];
+  if (dernier === ".") return false;
+  const ent = distrib(dernier);
+  const t = tire(ent, glouton);
+  dernierChoix = t; derniereDistrib = ent;
+  dessineEventail($("#eventail"), ent, t);          // on montre le choix sur l'éventail
+  ctx.push(t); nouveaux = new Set([ctx.length - 1]);
+  if (ctx.length > DEPART.length + 14 && t !== ".") { ctx.push("."); derniereDistrib = [{ t: ".", p: 1, garde: true }]; }
+  if (ctx[ctx.length - 1] === ".") archive();
+  return true;
+}
+function avance(glouton) {
+  if (occupe) return;
+  pas(glouton);
+  occupe = true; $("#b-tirer").disabled = $("#b-max").disabled = $("#b-fin").disabled = true;
+  setTimeout(() => { occupe = false; dernierChoix = null; rendContexte(); }, reduit ? 0 : 650);
+  const box = $("#contexte"); // mise à jour immédiate du texte
+  box.textContent = ""; ctx.forEach((tk, i) => { const s = document.createElement("span"); s.className = "tk" + (i >= DEPART.length ? " gen" : "") + (nouveaux.has(i) ? " neuf" : ""); s.textContent = tk; box.appendChild(s); });
+}
+function jusquauPoint() {
+  if (occupe) return;
+  occupe = true;
+  const tour = () => {
+    if (ctx[ctx.length - 1] === ".") { occupe = false; dernierChoix = null; rendContexte(); return; }
+    pas(false); rendContexteTexte();
+    setTimeout(tour, reduit ? 0 : 420);
+  };
+  tour();
+}
+function rendContexteTexte() {
+  const box = $("#contexte"); box.textContent = "";
+  ctx.forEach((tk, i) => { const s = document.createElement("span"); s.className = "tk" + (i >= DEPART.length ? " gen" : "") + (nouveaux.has(i) ? " neuf" : ""); s.textContent = tk; box.appendChild(s); });
+  $("#b-tirer").disabled = $("#b-max").disabled = $("#b-fin").disabled = true;
+}
+function archive() {
+  const li = document.createElement("li");
+  li.textContent = ctx.join("");
+  const sp = document.createElement("span"); sp.textContent = `température ${fmt(+$("#temp").value)}`;
+  li.appendChild(sp);
+  const h = $("#historique"); h.prepend(li);
+  while (h.children.length > 6) h.lastChild.remove();
+}
+function reset() { if (occupe) return; ctx = [...DEPART]; nouveaux = new Set(); dernierChoix = null; derniereDistrib = null; rendContexte(); }
+$("#b-tirer").addEventListener("click", () => avance(false));
+$("#b-max").addEventListener("click", () => avance(true));
+$("#b-fin").addEventListener("click", jusquauPoint);
+$("#b-reset").addEventListener("click", reset);
+["temp", "topp"].forEach(id => $("#" + id).addEventListener("input", () => {
+  $("#" + id + "-v").textContent = fmt(+$("#" + id).value);
+  if (!occupe) rendContexte();
+}));
+reset();
+
+/* ======================================================= 4. mémoire / RAG */
+const DOC = `Internet n'a pas d'inventeur unique. Il est issu d'ARPANET, réseau mis en service en 1969,
+et repose sur les protocoles TCP/IP, dont <mark>Vinton Cerf et Robert Kahn</mark> publient les principes
+en 1974. Le Web, inventé par Tim Berners-Lee au CERN en 1989, est une application qui circule sur Internet.`;
+$("#doc-txt").innerHTML = DOC;
+const MODES = {
+  mem: { ent: [[" Tim",.61],[" Vinton",.16],[" Internet",.08],[" Bill",.06],[" Al",.04],[" Steve",.05]],
+         rep: ["Tim"," Berners","-Lee"," et"," Robert"," Cail","liau","."],
+         verdict: ["faux", "Réponse assurée, et fausse : Berners-Lee et Cailliau ont inventé le Web, pas Internet. L'association la plus fréquente dans les textes l'a emporté."] },
+  doc: { ent: [[" Internet",.58],[" Vinton",.31],[" Tim",.05],[" Bill",.02],[" Al",.02],[" Steve",.02]],
+         rep: ["Internet"," n'a"," pas"," d'","inventeur"," unique"," :"," il"," est"," né"," d'","ARP","ANET"," (","1969",")"," et"," des"," protocoles"," TCP","/IP"," de"," Vinton"," Cerf"," et"," Robert"," Kahn"," (","1974",")","."],
+         verdict: ["ok", "Réponse correcte et vérifiable : chaque élément se retrouve dans l'extrait fourni. La matière était dans le contexte, le modèle n'a eu qu'à la transformer."] }
+};
+let mode = "mem", anim = null;
+function choisirMode(m) {
+  mode = m; clearTimeout(anim);
+  $("#m-mem").setAttribute("aria-pressed", m === "mem"); $("#m-doc").setAttribute("aria-pressed", m === "doc");
+  $("#doc").hidden = m !== "doc";
+  $("#reponse").textContent = ""; $("#verdict").hidden = true;
+  dessineEventail($("#eventail2"), MODES[m].ent.map(([t, p]) => ({ t, p, garde: true })), null,
+    { h: 200, label: m === "doc" ? "réseau + extrait" : "réseau seul" });
+}
+function genereReponse() {
+  clearTimeout(anim);
+  const M = MODES[mode], out = $("#reponse"); out.textContent = ""; $("#verdict").hidden = true;
+  dessineEventail($("#eventail2"), M.ent.map(([t, p]) => ({ t, p, garde: true })), M.ent[0][0],
+    { h: 200, label: mode === "doc" ? "réseau + extrait" : "réseau seul" });
+  let i = 0;
+  const tour = () => {
+    if (i < M.rep.length) {
+      const s = document.createElement("span"); s.textContent = M.rep[i++];
+      s.style.borderBottom = "2px solid var(--vclair)"; out.appendChild(s);
+      anim = setTimeout(tour, reduit ? 0 : 110);
+    } else {
+      const v = $("#verdict"); v.className = "verdict " + M.verdict[0]; v.textContent = M.verdict[1]; v.hidden = false;
+    }
+  };
+  tour();
+}
+$("#m-mem").addEventListener("click", () => choisirMode("mem"));
+$("#m-doc").addEventListener("click", () => choisirMode("doc"));
+$("#b-rep").addEventListener("click", genereReponse);
+choisirMode("mem");
+let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { if (!occupe) rendContexte(); choisirMode(mode); }, 200); });
+})();
+</script>
+</body>
+</html>
