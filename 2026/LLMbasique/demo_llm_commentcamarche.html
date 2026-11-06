@@ -124,6 +124,17 @@ button[aria-pressed="true"]{background:var(--encre);color:#fff;border-color:var(
 footer{margin-top:64px;padding-top:18px;border-top:1px solid var(--grisbord);font-family:var(--sans);
   font-size:.8rem;color:var(--gris);line-height:1.5}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---- version en ligne : arrivée depuis l'article et retour ---- */
+section{scroll-margin-top:64px}
+section:target .num::after{content:"  ·  vous arrivez de l'article";color:var(--rose);font-weight:600}
+.retour{position:fixed;right:18px;bottom:18px;z-index:20;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.retour button{font-family:var(--sans);font-size:.9rem;font-weight:600;color:#fff;background:var(--violet);
+  border:0;border-radius:999px;padding:10px 16px;cursor:pointer;box-shadow:0 4px 14px rgba(59,26,85,.25)}
+.retour button:hover{background:var(--encre)}
+.retour p{margin:0;max-width:260px;font-family:var(--sans);font-size:.8rem;line-height:1.35;color:var(--encre);
+  background:var(--papier);border:1px solid var(--grisbord);border-radius:10px;padding:8px 10px}
+@media print{.retour{display:none}}
 </style>
 </head>
 <body>
@@ -267,7 +278,7 @@ footer{margin-top:64px;padding-top:18px;border-top:1px solid var(--grisbord);fon
   Ce démonstrateur n'embarque aucun vrai modèle : découpages, poids d'attention et probabilités sont
   fabriqués à la main pour rendre les mécanismes visibles. Il accompagne l'article « Que se passe-t-il
   réellement lorsque vous posez une question à une IA ? », Frédéric Ros, Technopole d'Orléans,
-  LAB'IA Loire Valley, 2026. Fonctionne hors ligne, dans n'importe quel navigateur récent.
+  LAB'IA Loire Valley, 2026. Fonctionne en ligne ou hors ligne, dans n'importe quel navigateur récent.
 </footer>
 </div>
 
@@ -623,6 +634,26 @@ $("#b-rep").addEventListener("click", genereReponse);
 choisirMode("mem");
 let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { if (!occupe) rendContexte(); choisirMode(mode); }, 200); });
 })();
+</script>
+
+<div class="retour">
+  <p id="retour-note" hidden>Fermez cet onglet : l'article est resté ouvert à la page où vous étiez.</p>
+  <button id="retour-btn" type="button">&larr; Revenir à l'article</button>
+</div>
+<script>
+/* Les liens d'étapes ne s'empilent pas dans l'historique : « Revenir » ramène donc toujours à l'article. */
+document.querySelectorAll('nav.etapes a[href^="#"]').forEach(function(a){
+  a.addEventListener('click', function(e){
+    var t = document.querySelector(a.getAttribute('href')); if(!t) return;
+    e.preventDefault(); history.replaceState(null, '', a.getAttribute('href'));
+    t.scrollIntoView({behavior: 'smooth', block: 'start'});
+  });
+});
+document.getElementById('retour-btn').addEventListener('click', function(){
+  if (history.length > 1 && document.referrer !== '') { history.back(); return; }
+  if (history.length > 1) { history.back(); setTimeout(function(){ document.getElementById('retour-note').hidden = false; }, 400); return; }
+  document.getElementById('retour-note').hidden = false;      // ouvert dans une nouvelle fenêtre (lecteur PDF) : rien à « reculer »
+});
 </script>
 </body>
 </html>
